@@ -7,6 +7,24 @@ import { render, renderView, renderStopList, toggleVisited, exportRoute, exportT
 import { startNavigation, stopNavigation, updateNavUI, openNavDirPanel, closeNavDirPanel } from './nav.js';
 import { showAddrModal, hideAddrModal, resetToDefaultStops, setupAutocomplete, parsePastedText, addManualAddress, confirmAddresses, initAddressUI } from './addresses.js';
 
+// Mobile view helpers
+function isMobile() { return window.innerWidth < 768; }
+function switchMobileView(view) {
+  const navMap = document.getElementById('mobileNavMap');
+  const navPlan = document.getElementById('mobileNavPlan');
+  const bs = document.getElementById('bottomSheet');
+  bs.style.transform = '';
+  if (view === 'plan') {
+    navPlan.classList.add('active');
+    navMap.classList.remove('active');
+    bs.classList.add('mobile-plan-visible');
+  } else {
+    navMap.classList.add('active');
+    navPlan.classList.remove('active');
+    bs.classList.remove('mobile-plan-visible');
+  }
+}
+
 // Expose popup toggle globally (needed for marker popup onclick)
 window._popupToggleVisit = function(id) {
   toggleVisited(id);
@@ -35,8 +53,11 @@ document.getElementById('resetBtn').onclick = () => {
 };
 document.getElementById('setHomeBtn').onclick = showHomeModal;
 document.getElementById('setStartBtn').onclick = showStartModal;
-document.getElementById('topCard').onclick = () => setSheetState(state.sheetState === 'expanded' ? 'peek' : 'expanded');
-document.getElementById('startNavBtn').onclick = () => startNavigation(renderView);
+document.getElementById('topCard').onclick = () => {
+  if (isMobile()) { switchMobileView('plan'); }
+  else { setSheetState(state.sheetState === 'expanded' ? 'peek' : 'expanded'); }
+};
+document.getElementById('startNavBtn').onclick = () => { if (isMobile()) switchMobileView('map'); startNavigation(renderView); };
 document.getElementById('gmapsFullRouteBtn').onclick = exportToGoogleMaps;
 document.getElementById('nextStopCard').addEventListener('dblclick', () => {
   const id = parseInt(document.getElementById('nextStopCard').dataset.spotId);
@@ -112,7 +133,7 @@ document.addEventListener('keydown', e => {
     if (state.isNavigating) { stopNavigation(renderView, setSheetState); return; }
     if (document.getElementById('homeModal').classList.contains('show')) { hideHomeModal(); return; }
     if (document.getElementById('startModal').classList.contains('show')) { hideStartModal(); return; }
-    setSheetState('collapsed'); return;
+    if (isMobile()) { switchMobileView('map'); } else { setSheetState('collapsed'); } return;
   }
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
   if (e.key === 'n' || e.key === 'N') startNavigation(renderView);
@@ -204,11 +225,17 @@ setupAutocomplete(
   }, onEnter() { document.getElementById('startConfirmBtn').click(); }}
 );
 
-// Bottom sheet touch handling
+// Mobile nav bar (Map/Plan toggle)
+document.getElementById('mobileNavMap').onclick = () => switchMobileView('map');
+document.getElementById('mobileNavPlan').onclick = () => switchMobileView('plan');
+
 const sheet = document.getElementById('bottomSheet');
+
+// Bottom sheet touch handling (desktop/tablet only)
 const handle = document.getElementById('sheetHandle');
 
 handle.addEventListener('click', () => {
+  if (isMobile()) return;
   if (state.sheetState === 'expanded') setSheetState('peek');
   else if (state.sheetState === 'peek') setSheetState('expanded');
   else setSheetState('peek');
@@ -216,6 +243,7 @@ handle.addEventListener('click', () => {
 
 let sheetStartY = 0, sheetStartTranslate = 0, sheetDragging = false, sheetLastY = 0, sheetVelocity = 0, sheetLastTime = 0;
 handle.addEventListener('touchstart', e => {
+  if (isMobile()) return;
   sheetDragging = true;
   sheetStartY = e.touches[0].clientY;
   sheetLastY = sheetStartY;
