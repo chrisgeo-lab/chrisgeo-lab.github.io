@@ -1,8 +1,17 @@
-const CACHE_NAME = 'routeflow-v2';
+const CACHE_NAME = 'routeflow-v3';
 const STATIC_ASSETS = [
   './',
   './index.html',
   './manifest.json',
+  './js/app.js',
+  './js/state.js',
+  './js/utils.js',
+  './js/routing.js',
+  './js/solver.js',
+  './js/map.js',
+  './js/ui.js',
+  './js/nav.js',
+  './js/addresses.js',
   'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css'
 ];
