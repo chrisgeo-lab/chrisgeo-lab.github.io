@@ -738,79 +738,127 @@ body.navigating .recenter-btn.show{bottom:130px}
   .panel-toggle.panel-hidden{right:0;border-radius:8px 0 0 8px}
 }
 
+/* Mobile nav bar */
+.mobile-nav{
+  display:none;position:fixed;bottom:0;left:0;right:0;z-index:1100;
+  background:var(--card-solid);border-top:1px solid var(--separator);
+  padding:6px 0 calc(6px + env(safe-area-inset-bottom));
+  justify-content:space-around;align-items:center;
+  box-shadow:0 -2px 12px rgba(0,0,0,.06)
+}
+.mobile-nav-tab{
+  display:flex;flex-direction:column;align-items:center;gap:2px;
+  background:none;border:none;cursor:pointer;padding:6px 24px;
+  border-radius:var(--radius-xs);transition:all .15s;
+  color:var(--secondary);font-family:var(--font)
+}
+.mobile-nav-tab.active{color:var(--blue)}
+.mobile-nav-tab:active{transform:scale(.92)}
+.mobile-nav-icon{font-size:20px;line-height:1}
+.mobile-nav-label{font-size:10px;font-weight:600}
+
 /* Mobile layout */
 @media(max-width:767px){
   html,body{overflow-x:hidden;max-width:100vw}
 
-  .top-bar{
-    padding:calc(8px + env(safe-area-inset-top)) 10px 8px;
-    gap:6px;flex-wrap:wrap;
-    max-height:calc(100px + env(safe-area-inset-top));overflow:hidden
-  }
-  .top-card{padding:8px 10px;max-width:120px}
-  .top-title{font-size:13px}
-  .top-subtitle{font-size:10px}
-  .cluster-card{
-    min-width:auto;padding:8px 10px;gap:8px;
-    order:10;flex:1 1 100%;margin-top:2px;border-radius:var(--radius-sm);
-    max-width:100%
-  }
-  .cluster-card input[type=range]{height:6px}
-  .cluster-card input[type=range]::-webkit-slider-thumb{width:24px;height:24px}
-  .reset-btn{padding:8px 12px;font-size:11px}
+  /* Show mobile nav bar */
+  .mobile-nav{display:flex}
 
+  /* Top bar: keep RouteFlow and cluster slider side by side */
+  .top-bar{
+    padding:calc(6px + env(safe-area-inset-top)) 10px 6px;
+    gap:8px;flex-wrap:nowrap;align-items:center
+  }
+  .top-card{padding:6px 10px;flex-shrink:0}
+  .top-title{font-size:13px}
+  .top-subtitle{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:80px}
+  .top-spacer{display:none}
+  .cluster-card{
+    min-width:0;padding:6px 10px;gap:6px;
+    flex:1;border-radius:var(--radius-sm);
+    order:0
+  }
+  .cluster-card label{font-size:11px}
+  .cluster-card input[type=range]{height:6px;min-width:40px}
+  .cluster-card input[type=range]::-webkit-slider-thumb{width:22px;height:22px}
+  .cluster-card .val{font-size:12px;padding:2px 5px}
+  .reset-btn{display:none}
+
+  /* Map controls: vertically constrained */
   .map-controls{
-    top:calc(100px + env(safe-area-inset-top));
-    bottom:calc(200px + env(safe-area-inset-bottom));
-    right:10px;transform:none;
+    top:calc(56px + env(safe-area-inset-top));
+    bottom:auto;right:10px;transform:none;
+    max-height:calc(100vh - 56px - env(safe-area-inset-top) - 70px);
+    max-height:calc(100dvh - 56px - env(safe-area-inset-top) - 70px);
     overflow-y:auto;overflow-x:hidden;
-    scrollbar-width:none;max-height:none
+    scrollbar-width:none
   }
   .map-controls::-webkit-scrollbar{display:none}
   .map-ctrl-btn{width:38px;height:38px;font-size:16px}
 
+  /* Bottom sheet: full-screen panel mode, hidden by default (Map view active) */
   .bottom-sheet{
-    height:60vh;height:60dvh;
-    transform:translateY(calc(60vh - 180px));
-    padding-bottom:env(safe-area-inset-bottom);
-    max-height:calc(100vh - env(safe-area-inset-top) - 60px);
-    max-height:calc(100dvh - env(safe-area-inset-top) - 60px)
+    position:fixed;inset:0;z-index:1050;
+    height:100%;height:100dvh;
+    border-radius:0;
+    transform:translateY(100%);
+    padding-top:calc(env(safe-area-inset-top) + 4px);
+    padding-bottom:calc(56px + env(safe-area-inset-bottom));
+    box-shadow:none;
+    transition:transform .3s cubic-bezier(.4,0,.2,1)
   }
-  .bottom-sheet.expanded{transform:translateY(0)}
-  .bottom-sheet.collapsed{transform:translateY(calc(60vh - 70px))}
+  .bottom-sheet.mobile-plan-visible{
+    transform:translateY(0)
+  }
+  .bottom-sheet.expanded,
+  .bottom-sheet.collapsed{
+    transform:translateY(100%)
+  }
+  .bottom-sheet.expanded.mobile-plan-visible,
+  .bottom-sheet.collapsed.mobile-plan-visible{
+    transform:translateY(0)
+  }
+  .sheet-handle-area{display:none}
 
-  .next-stop{margin:10px 12px;padding:14px 16px}
+  /* Next stop card */
+  .next-stop{margin:8px 12px;padding:14px 16px}
+  .next-stop-label{font-size:10px}
   .next-stop-street{font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .next-stop-meta{font-size:12px}
-  .next-stop-actions{flex-wrap:wrap;gap:6px}
-  .nav-btn{
-    padding:12px 14px;font-size:13px;flex:1 1 auto;text-align:center;
-    min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis
+  .next-stop-meta{font-size:12px;gap:8px}
+  .next-stop-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+  .next-stop-actions .nav-btn{
+    padding:12px 10px;font-size:14px;text-align:center;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0
   }
-  .nav-btn-wide{flex:1 1 100%}
+  .next-stop-actions .nav-btn-wide{grid-column:1 / -1}
   #gmapsExportCard{margin:0 12px 8px !important}
-  .gmaps-btn{padding:14px 16px;font-size:15px}
+  .gmaps-btn{padding:14px 16px;font-size:14px}
 
-  .route-summary{padding:12px 16px;gap:8px}
-  .route-summary-stats{gap:4px}
-  .route-stat{padding:6px 2px}
-  .route-stat-val{font-size:15px}
-  .route-stat-label{font-size:8px}
+  /* Route summary */
+  .route-summary{padding:12px 14px;gap:6px}
+  .route-summary-stats{gap:2px}
+  .route-stat{padding:8px 4px}
+  .route-stat-val{font-size:16px}
+  .route-stat-label{font-size:9px}
 
+  /* Filter/dropdown */
   .filter-row{padding:8px 12px}
-  .route-dropdown-trigger{padding:10px 12px;font-size:14px}
+  .route-dropdown-trigger{padding:12px 14px;font-size:14px}
   .route-dropdown-menu{left:12px;right:12px}
 
-  .stop-item{padding:12px 14px;gap:10px}
-  .stop-item-check{width:26px;height:26px;font-size:12px}
-  .stop-item-num{width:22px;height:22px;font-size:9px}
-  .stop-item-name{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .stop-item-detail{font-size:11px;overflow:hidden}
+  /* Stop list */
+  .stop-item{padding:14px 16px;gap:10px}
+  .stop-item-check{width:28px;height:28px;font-size:12px}
+  .stop-item-num{width:24px;height:24px;font-size:10px}
+  .stop-item-name{font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .stop-item-detail{font-size:12px;overflow:hidden}
 
+  /* Directions */
   .dir-leg-hdr{padding:12px 14px}
   .dir-step{padding:10px 14px 10px 24px}
   .dir-step-text{font-size:13px}
 
+  /* Modals */
   .modal-overlay{overflow-y:auto;overflow-x:hidden;padding:16px}
   .modal{padding:20px;margin:0;max-width:calc(100vw - 32px);max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px);overflow-y:auto}
   .modal-input{padding:12px;font-size:16px}
@@ -821,11 +869,13 @@ body.navigating .recenter-btn.show{bottom:130px}
   }
   .modal-actions .modal-btn-danger{flex:0 1 auto}
 
+  /* Recenter button */
   .recenter-btn{
-    bottom:calc(190px + env(safe-area-inset-bottom));
+    bottom:calc(66px + env(safe-area-inset-bottom));
     right:10px;width:38px;height:38px
   }
 
+  /* Toast */
   .toast{
     top:auto;bottom:calc(80px + env(safe-area-inset-bottom));
     left:16px;right:16px;max-width:calc(100vw - 32px);
@@ -834,50 +884,66 @@ body.navigating .recenter-btn.show{bottom:130px}
   }
   .toast.show{transform:translateY(0) scale(1);pointer-events:auto}
 
+  /* FAB position above nav bar */
+  .fab-add-stops{bottom:calc(70px + env(safe-area-inset-bottom))}
+
+  /* Nav overlay containment */
   .nav-overlay{overflow:hidden}
   .nav-instruction{max-width:100vw;overflow:hidden}
   .nav-bottom{max-width:100vw;overflow:hidden}
+
+  /* Hide desktop panel toggle on mobile */
+  .panel-toggle{display:none !important}
+
+  /* Hide mobile nav during navigation */
+  body.navigating .mobile-nav{display:none}
 }
 
 /* Landscape mobile */
 @media(max-width:767px) and (orientation:landscape){
-  .top-bar{padding:4px 10px;gap:4px;max-height:50px}
-  .top-card{padding:6px 8px}
-  .top-title{font-size:12px}
-  .cluster-card{padding:6px 8px;margin-top:0;flex:0 1 auto}
-  .bottom-sheet{height:85vh;transform:translateY(calc(85vh - 100px))}
-  .bottom-sheet.expanded{transform:translateY(0)}
-  .bottom-sheet.collapsed{transform:translateY(calc(85vh - 40px))}
-  .next-stop{margin:4px 10px;padding:8px 12px}
-  .next-stop-street{font-size:13px}
-  .next-stop-actions{gap:4px}
-  .nav-btn{padding:8px 10px;font-size:11px}
+  .top-bar{padding:4px 10px;gap:6px}
+  .top-card{padding:4px 8px}
+  .top-title{font-size:11px}
+  .top-subtitle{display:none}
+  .cluster-card{padding:4px 8px;gap:4px}
+  .cluster-card label{font-size:10px}
+  .mobile-nav{padding:4px 0 calc(4px + env(safe-area-inset-bottom))}
+  .mobile-nav-icon{font-size:16px}
+  .mobile-nav-label{font-size:9px}
+  .bottom-sheet{
+    padding-bottom:calc(44px + env(safe-area-inset-bottom))
+  }
+  .next-stop{margin:4px 8px;padding:8px 10px}
+  .next-stop-label{font-size:9px}
+  .next-stop-street{font-size:12px}
+  .next-stop-actions{grid-template-columns:1fr 1fr 1fr;gap:4px}
+  .next-stop-actions .nav-btn{padding:6px 6px;font-size:11px}
+  .next-stop-actions .nav-btn-wide{grid-column:auto}
   .map-controls{
-    top:55px;bottom:110px;right:8px;
-    flex-direction:row;flex-wrap:wrap;width:72px;gap:1px
+    top:44px;bottom:auto;right:8px;
+    max-height:calc(100vh - 44px - 60px);
+    flex-direction:row;flex-wrap:wrap;width:72px;gap:0
   }
   .map-ctrl-btn{width:34px;height:34px;font-size:14px}
   .map-ctrl-btn+.map-ctrl-btn{border-top:none}
-  .stop-item{padding:8px 10px}
-  .route-summary{padding:8px 12px}
-  .route-stat-val{font-size:13px}
+  .stop-item{padding:6px 10px}
+  .route-summary{padding:6px 10px}
+  .route-stat-val{font-size:12px}
   .route-stat-label{font-size:7px}
 }
 
 /* Very small screens (SE, etc) */
 @media(max-width:375px){
   .top-card{display:none}
-  .top-bar{max-height:calc(60px + env(safe-area-inset-top))}
-  .cluster-card{padding:6px 8px;gap:6px}
+  .cluster-card{padding:5px 8px;gap:5px}
   .cluster-card label{font-size:10px}
-  .cluster-card .val{font-size:12px;padding:2px 4px}
-  .next-stop{padding:12px 14px;margin:8px 10px}
-  .next-stop-street{font-size:15px}
+  .cluster-card .val{font-size:11px;padding:2px 4px}
+  .next-stop{padding:10px 12px;margin:6px 10px}
+  .next-stop-street{font-size:14px}
   .next-stop-actions{gap:4px}
-  .next-stop-actions .nav-btn{padding:10px 8px;font-size:12px}
-  .next-stop-actions .nav-btn-wide{flex:1 1 100%}
-  .route-summary-stats{gap:2px}
-  .route-stat{padding:4px 2px}
+  .next-stop-actions .nav-btn{padding:9px 6px;font-size:12px}
+  .route-summary-stats{gap:0}
+  .route-stat{padding:4px 1px}
   .route-stat-val{font-size:13px}
   .route-stat-label{font-size:7px}
   .empty-state{padding:24px 16px}
@@ -886,7 +952,7 @@ body.navigating .recenter-btn.show{bottom:130px}
   .empty-state-btn{padding:12px 18px;font-size:13px}
   .map-ctrl-btn{width:34px;height:34px;font-size:14px}
   .modal-btn{min-width:60px;padding:10px 8px;font-size:12px}
-  .gmaps-btn{padding:12px 14px;font-size:14px}
+  .gmaps-btn{padding:10px 12px;font-size:13px}
   .stop-item{padding:10px 12px;gap:8px}
   .stop-item-check{width:24px;height:24px;font-size:11px}
   .stop-item-num{width:20px;height:20px;font-size:8px}
@@ -1205,6 +1271,18 @@ body.navigating .recenter-btn.show{bottom:130px}
 <button class="recenter-btn" id="recenterBtn" aria-label="Re-center map on GPS position">&#9737;</button>
 <button class="fab-add-stops" id="fabAddStops" aria-label="Add stops to plan route">&#43; Add Stops</button>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<!-- Mobile bottom nav bar -->
+<nav class="mobile-nav" id="mobileNav">
+  <button class="mobile-nav-tab active" id="mobileNavMap" aria-label="Map view">
+    <span class="mobile-nav-icon">&#9873;</span>
+    <span class="mobile-nav-label">Map</span>
+  </button>
+  <button class="mobile-nav-tab" id="mobileNavPlan" aria-label="Plan view">
+    <span class="mobile-nav-icon">&#9776;</span>
+    <span class="mobile-nav-label">Plan</span>
+  </button>
+</nav>
 
 <!-- End Point modal -->
 <div class="modal-overlay" id="homeModal">
