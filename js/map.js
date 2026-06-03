@@ -14,7 +14,13 @@ export const map = new maplibregl.Map({
   pitch: 0,
   bearing: 0,
   attributionControl: false,
-  maxZoom: 19
+  maxZoom: 19,
+  dragPan: true,
+  dragRotate: false,
+  scrollZoom: true,
+  touchZoomRotate: true,
+  doubleClickZoom: true,
+  touchPitch: false
 });
 
 map.addControl(new maplibregl.AttributionControl({compact: true}), 'bottom-left');

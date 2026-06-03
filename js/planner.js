@@ -44,7 +44,10 @@ export async function render() {
   if (!state.SPOTS.length) {
     state.currentRoutes = []; renderView(); return;
   }
-  const unvisitedIndices = state.SPOTS.map((_, i) => i).filter(i => !state.visitedSet.has(state.SPOTS[i].id));
+  const excludedSpotIds = new Set();
+  if (state.startPoint && state.startPoint.spotId != null) excludedSpotIds.add(state.startPoint.spotId);
+  if (state.home && state.home.spotId != null) excludedSpotIds.add(state.home.spotId);
+  const unvisitedIndices = state.SPOTS.map((_, i) => i).filter(i => !state.visitedSet.has(state.SPOTS[i].id) && !excludedSpotIds.has(i));
   if (!unvisitedIndices.length) {
     state.currentRoutes = []; renderView(); setLoading(false); return;
   }

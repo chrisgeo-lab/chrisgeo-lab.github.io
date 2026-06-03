@@ -122,24 +122,15 @@ document.getElementById('searchInput').oninput = () => renderStopList();
 
 // Home modal
 document.getElementById('homeCancelBtn').onclick = hideHomeModal;
-document.getElementById('homeClearBtn').onclick = () => {
-  state.home = null; localStorage.removeItem('routeflow-home');
-  hideHomeModal(); render();
-  toast('End point removed');
-};
 document.getElementById('homeConfirmBtn').onclick = confirmHome;
 document.getElementById('homeInput').onkeydown = (e) => { if (e.key === 'Enter') confirmHome(); };
+document.getElementById('homeModal').onclick = e => { if (e.target.id === 'homeModal') hideHomeModal(); };
 
 // Start modal
 document.getElementById('startCancelBtn').onclick = hideStartModal;
-document.getElementById('startClearBtn').onclick = () => {
-  state.startPoint = null; localStorage.removeItem('routeflow-start');
-  hideStartModal(); state.durationMatrix = null;
-  render();
-  toast('Start point cleared');
-};
 document.getElementById('startConfirmBtn').onclick = confirmStart;
 document.getElementById('startInput').onkeydown = (e) => { if (e.key === 'Enter') confirmStart(); };
+document.getElementById('startModal').onclick = e => { if (e.target.id === 'startModal') hideStartModal(); };
 
 // Address manager
 document.getElementById('manageStopsBtn').onclick = showAddrModal;
