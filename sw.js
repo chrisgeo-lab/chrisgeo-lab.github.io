@@ -1,4 +1,4 @@
-const CACHE_NAME = 'routeflow-v10';
+const CACHE_NAME = 'routeflow-v13';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -11,6 +11,8 @@ const STATIC_ASSETS = [
   './js/solver.js',
   './js/map.js',
   './js/ui.js',
+  './js/exports.js',
+  './js/modals.js',
   './js/addresses.js',
   './js/geocoder.js',
   './js/tour.js',

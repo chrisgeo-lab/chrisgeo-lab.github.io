@@ -295,8 +295,13 @@
         <div class="addr-geocode-progress-fill" id="addrGeoProgressFill"></div>
       </div>
     </div>
-    <div class="addr-replace-note" id="addrReplaceNote" style="display:none">
-      <span>&#9888;</span> This will replace current stops and reset progress
+    <div class="addr-mode-toggle" id="addrModeToggle" style="display:none">
+      <button class="addr-mode-btn active" data-mode="append" id="addrModeAppend">
+        <span class="addr-mode-icon">&#43;</span> Add to existing stops
+      </button>
+      <button class="addr-mode-btn" data-mode="replace" id="addrModeReplace">
+        <span class="addr-mode-icon">&#8634;</span> Replace all stops
+      </button>
     </div>
     <div class="addr-footer">
       <span class="addr-footer-count" id="addrFooterCount">0 addresses staged</span>
