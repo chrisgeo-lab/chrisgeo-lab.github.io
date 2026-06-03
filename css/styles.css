@@ -1012,11 +1012,13 @@ body{
   transform:translate(-50%,-50%) scale(1) !important;
   bottom:auto !important;right:auto !important
 }
-.tour-tooltip-icon{
-  font-size:28px;margin-bottom:12px;
-  width:48px;height:48px;border-radius:14px;
-  background:linear-gradient(135deg,rgba(0,122,255,.1),rgba(88,86,214,.1));
-  display:flex;align-items:center;justify-content:center
+.tour-progress{
+  height:3px;background:var(--fill);border-radius:2px;
+  margin-bottom:16px;overflow:hidden
+}
+.tour-progress-fill{
+  height:100%;background:var(--blue);border-radius:2px;
+  transition:width .3s cubic-bezier(.4,0,.2,1)
 }
 .tour-tooltip-title{
   font-size:17px;font-weight:700;color:var(--text);margin-bottom:8px;
@@ -1028,13 +1030,9 @@ body{
 .tour-tooltip-footer{
   display:flex;align-items:center;justify-content:space-between;gap:12px
 }
-.tour-dots{display:flex;gap:5px;align-items:center}
-.tour-dot{
-  width:6px;height:6px;border-radius:50%;background:var(--tertiary);
-  transition:all .25s
-}
-.tour-dot.active{
-  width:18px;border-radius:3px;background:var(--blue)
+.tour-step-count{
+  font-size:12px;color:var(--tertiary);font-weight:500;
+  white-space:nowrap
 }
 .tour-actions{display:flex;gap:8px}
 .tour-btn{
@@ -1049,10 +1047,6 @@ body{
 .tour-btn-back:hover{background:rgba(120,120,128,.18)}
 .tour-btn-skip{background:none;color:var(--secondary);padding:9px 10px}
 .tour-btn-skip:hover{color:var(--text)}
-.tour-step-count{
-  position:absolute;top:12px;right:16px;
-  font-size:11px;color:var(--tertiary);font-weight:500
-}
 body.tour-active .bottom-sheet,
 body.tour-active .top-bar,
 body.tour-active .map-controls,
@@ -1077,7 +1071,6 @@ body.tour-active .fab-add-stops{
   }
   .tour-tooltip-title{font-size:16px}
   .tour-tooltip-body{font-size:13px;margin-bottom:16px}
-  .tour-tooltip-icon{width:40px;height:40px;font-size:22px;border-radius:10px;margin-bottom:10px}
 }
 
 @media(max-width:767px){
