@@ -1,8 +1,9 @@
-const CACHE_NAME = 'routeflow-v4';
+const CACHE_NAME = 'routeflow-v6';
 const STATIC_ASSETS = [
   './',
   './index.html',
   './manifest.json',
+  './css/styles.css',
   './js/app.js',
   './js/state.js',
   './js/utils.js',
@@ -12,8 +13,9 @@ const STATIC_ASSETS = [
   './js/ui.js',
   './js/nav.js',
   './js/addresses.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css'
+  './js/geocoder.js',
+  'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js',
+  'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css'
 ];
 
 self.addEventListener('install', e => {
@@ -34,15 +36,18 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
+
+  if (e.request.method !== 'GET') return;
+
   const filename = url.pathname.split('/').pop();
 
-  // Cache-first for static assets and tile images
   const isStaticAsset = STATIC_ASSETS.some(asset => {
     if (asset.startsWith('http')) return e.request.url.startsWith(asset);
     const assetFile = asset.replace('./', '');
     return filename === assetFile || url.pathname.endsWith(assetFile);
   });
-  if (isStaticAsset || url.hostname.includes('basemaps.cartocdn.com')) {
+
+  if (isStaticAsset || url.hostname.includes('basemaps.cartocdn.com') || url.hostname.includes('cartocdn.com')) {
     e.respondWith(
       caches.match(e.request).then(cached => {
         if (cached) return cached;
@@ -58,10 +63,10 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // Network-first for OSRM/Nominatim/Photon API calls (with cache fallback for offline)
   if (url.hostname === 'router.project-osrm.org' ||
       url.hostname === 'nominatim.openstreetmap.org' ||
-      url.hostname === 'photon.komoot.io') {
+      url.hostname === 'photon.komoot.io' ||
+      url.hostname === 'geocoding.geo.census.gov') {
     e.respondWith(
       fetch(e.request).then(response => {
         if (response.ok) {
@@ -74,7 +79,6 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // Default: network with cache fallback
   e.respondWith(
     fetch(e.request).catch(() => caches.match(e.request))
   );
