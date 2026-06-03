@@ -1,8 +1,9 @@
-import { state, COLORS, STOP_MIN, STORE_V, STORE_H, STORE_SPOTS, STORE_CACHE, saveSet, saveJSON, loadJSON } from './state.js';
+import { state, COLORS, STOP_MIN, STORE_V, STORE_H, STORE_SPOTS, saveSet, saveJSON } from './state.js';
 import { esc, hd, fmtMi, fmtMiShort, fmtTime, fmtDur, toast, setLoading, showError, hideError } from './utils.js';
 import { fetchTable, fetchRoute, buildHaversineMatrix, getFullDurationMatrix } from './routing.js';
 import { clusterUnvisited, tspWithMatrix } from './solver.js';
-import { map, clearMap, addMarker, addPolyline, stopIcon, homeIcon } from './map.js';
+import { map, clearMap, addMarker, addPolyline, stopIcon, homeIcon, gpsIcon, trackPopup } from './map.js';
+import { geocodeFreeform } from './geocoder.js';
 
 function getStartLocation() {
   if (state.startPoint) return state.startPoint;
@@ -89,6 +90,20 @@ export async function render() {
   }
 }
 
+function bindPopup(marker, html) {
+  const el = marker._el || marker.getElement();
+  if (!el) return;
+  el.addEventListener('click', e => {
+    e.stopPropagation();
+    map.closePopup();
+    const popup = new maplibregl.Popup({maxWidth: '220px', className: 'stop-popup-wrap', offset: 12})
+      .setLngLat(marker.getLngLat())
+      .setHTML(html)
+      .addTo(map);
+    trackPopup(popup);
+  });
+}
+
 export function renderView() {
   clearMap();
   const routes = state.activeFilter >= 0 ? [state.currentRoutes[state.activeFilter]] : state.currentRoutes;
@@ -112,32 +127,33 @@ export function renderView() {
       const addr = [spot.city, spot.state, spot.zip].filter(Boolean).join(', ');
       let popup = `<div class="stop-popup"><div class="stop-popup-label" style="color:${rd.color}">Stop ${i + 1}</div><div class="stop-popup-street">${esc(spot.street)}</div>${addr ? `<div class="stop-popup-addr">${esc(addr)}</div>` : ''}`;
       if (legInfo) popup += `<div class="stop-popup-leg">${fmtMi(legInfo.distance)} mi · ${fmtDur(legInfo.duration)} from ${i === 0 ? 'start' : 'prev'}</div>`;
-      popup += `<button class="stop-popup-btn stop-popup-btn-visit" onclick="window._popupToggleVisit(${sid})">✓ Mark Visited</button></div>`;
-      mk.bindPopup(popup, {maxWidth: 220, className: 'stop-popup-wrap'});
+      popup += `<button class="stop-popup-btn stop-popup-btn-visit" onclick="window._popupToggleVisit(${sid})">&#10003; Mark Visited</button></div>`;
+      bindPopup(mk, popup);
       bounds.push([spot.lat, spot.lng]);
     });
   });
   if (state.showVisitedMarkers) {
     state.SPOTS.filter(s => state.visitedSet.has(s.id) && !routeSpotIds.has(s.id)).forEach(spot => {
-      const mk = addMarker(spot.lat, spot.lng, stopIcon('✓', '#aeaeb2', true, false));
+      const mk = addMarker(spot.lat, spot.lng, stopIcon('&#10003;', '#aeaeb2', true, false));
       const addr = [spot.city, spot.state, spot.zip].filter(Boolean).join(', ');
       let popup = `<div class="stop-popup"><div class="stop-popup-label" style="color:#aeaeb2">Visited</div><div class="stop-popup-street">${esc(spot.street)}</div>${addr ? `<div class="stop-popup-addr">${esc(addr)}</div>` : ''}`;
       popup += `<button class="stop-popup-btn stop-popup-btn-unvisit" onclick="window._popupToggleVisit(${spot.id})">Mark Unvisited</button></div>`;
-      mk.bindPopup(popup, {maxWidth: 220, className: 'stop-popup-wrap'});
+      bindPopup(mk, popup);
     });
   }
   if (state.home) {
-    addMarker(state.home.lat, state.home.lng, homeIcon()).bindPopup(`<div style="padding:10px;font-family:var(--font)"><div style="font-size:11px;color:#FF9500;font-weight:600">End Point</div><div style="font-size:14px;font-weight:600;margin-top:2px">${esc(state.home.label)}</div></div>`, {maxWidth: 200});
+    const mk = addMarker(state.home.lat, state.home.lng, homeIcon());
+    bindPopup(mk, `<div style="padding:10px;font-family:var(--font)"><div style="font-size:11px;color:#FF9500;font-weight:600">End Point</div><div style="font-size:14px;font-weight:600;margin-top:2px">${esc(state.home.label)}</div></div>`);
     bounds.push([state.home.lat, state.home.lng]);
   }
   if (state.startPoint) {
-    addMarker(state.startPoint.lat, state.startPoint.lng, L.divIcon({html: '<div style="width:20px;height:20px;background:#007AFF;border:2px solid #fff;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff">&#9654;</div>', iconSize: [20, 20], iconAnchor: [10, 10], className: ''})).bindPopup(`<div style="padding:10px;font-family:var(--font)"><div style="font-size:11px;color:#007AFF;font-weight:600">Start Point</div><div style="font-size:14px;font-weight:600;margin-top:2px">${esc(state.startPoint.label)}</div></div>`, {maxWidth: 200});
+    const mk = addMarker(state.startPoint.lat, state.startPoint.lng, {html: '<div style="width:20px;height:20px;background:#007AFF;border:2px solid #fff;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff">&#9654;</div>'});
+    bindPopup(mk, `<div style="padding:10px;font-family:var(--font)"><div style="font-size:11px;color:#007AFF;font-weight:600">Start Point</div><div style="font-size:14px;font-weight:600;margin-top:2px">${esc(state.startPoint.label)}</div></div>`);
     bounds.push([state.startPoint.lat, state.startPoint.lng]);
   }
-  if (state.persistentGpsMarker) map.removeLayer(state.persistentGpsMarker);
-  state.persistentGpsMarker = null;
+  if (state.persistentGpsMarker) { state.persistentGpsMarker.remove(); state.persistentGpsMarker = null; }
   if (state.gpsPos && !state.isNavigating) {
-    state.persistentGpsMarker = L.marker([state.gpsPos.lat, state.gpsPos.lng], {icon: L.divIcon({html: '<div class="gps-dot"><div class="gps-dot-core"></div><div class="gps-dot-ring"></div></div>', iconSize: [22, 22], iconAnchor: [11, 11], className: ''}), zIndexOffset: 9999}).addTo(map);
+    state.persistentGpsMarker = addMarker(state.gpsPos.lat, state.gpsPos.lng, gpsIcon());
   }
   if (bounds.length && !state.isNavigating && !state.suppressFitBounds) {
     const isDesktop = window.innerWidth >= 768;
@@ -486,35 +502,31 @@ export function showHomeModal() {
 }
 export function hideHomeModal() { document.getElementById('homeModal').classList.remove('show'); }
 
-export function confirmHome() {
+export async function confirmHome() {
   const val = document.getElementById('homeInput').value.trim();
   if (!val) {
     state.home = null; localStorage.removeItem(STORE_H); hideHomeModal(); render();
     toast('No end point set — route ends at last stop');
     return;
   }
-  const coords = val.match(/^\s*(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)\s*$/);
-  if (coords) {
-    state.home = {lat: parseFloat(coords[1]), lng: parseFloat(coords[2]), label: val};
-    saveJSON(STORE_H, state.home); hideHomeModal(); render();
-    toast('End point set');
-    return;
-  }
   const btn = document.getElementById('homeConfirmBtn');
   btn.textContent = 'Finding...'; btn.disabled = true;
-  fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(val)}&limit=1`)
-    .then(r => r.json()).then(res => {
-      btn.textContent = 'Set End'; btn.disabled = false;
-      if (res.length) {
-        state.home = {lat: parseFloat(res[0].lat), lng: parseFloat(res[0].lon), label: res[0].display_name.split(',').slice(0, 3).join(',')};
-        saveJSON(STORE_H, state.home); hideHomeModal(); render();
-        toast('End point set');
-      } else {
-        document.getElementById('homeInput').style.borderColor = 'var(--red)';
-        setTimeout(() => document.getElementById('homeInput').style.borderColor = '', 1500);
-        toast('Address not found');
-      }
-    }).catch(() => { btn.textContent = 'Set End'; btn.disabled = false; toast('Geocoding failed'); });
+  try {
+    const result = await geocodeFreeform(val);
+    btn.textContent = 'Set End'; btn.disabled = false;
+    if (result) {
+      state.home = {lat: result.lat, lng: result.lng, label: result.label || val};
+      saveJSON(STORE_H, state.home); hideHomeModal(); render();
+      toast('End point set');
+    } else {
+      document.getElementById('homeInput').style.borderColor = 'var(--red)';
+      setTimeout(() => document.getElementById('homeInput').style.borderColor = '', 1500);
+      toast('Address not found');
+    }
+  } catch {
+    btn.textContent = 'Set End'; btn.disabled = false;
+    toast('Geocoding failed');
+  }
 }
 
 // Start point modal
@@ -526,35 +538,31 @@ export function showStartModal() {
 }
 export function hideStartModal() { document.getElementById('startModal').classList.remove('show'); }
 
-export function confirmStart() {
+export async function confirmStart() {
   const val = document.getElementById('startInput').value.trim();
   if (!val) {
     state.startPoint = null; localStorage.removeItem('routeflow-start'); hideStartModal(); state.durationMatrix = null; render();
     toast('Using GPS as start point');
     return;
   }
-  const coords = val.match(/^\s*(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)\s*$/);
-  if (coords) {
-    state.startPoint = {lat: parseFloat(coords[1]), lng: parseFloat(coords[2]), label: val};
-    saveJSON('routeflow-start', state.startPoint); hideStartModal(); state.durationMatrix = null; render();
-    toast('Start point set');
-    return;
-  }
   const btn = document.getElementById('startConfirmBtn');
   btn.textContent = 'Finding...'; btn.disabled = true;
-  fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(val)}&limit=1`)
-    .then(r => r.json()).then(res => {
-      btn.textContent = 'Set Start'; btn.disabled = false;
-      if (res.length) {
-        state.startPoint = {lat: parseFloat(res[0].lat), lng: parseFloat(res[0].lon), label: res[0].display_name.split(',').slice(0, 3).join(',')};
-        saveJSON('routeflow-start', state.startPoint); hideStartModal(); state.durationMatrix = null; render();
-        toast('Start point set');
-      } else {
-        document.getElementById('startInput').style.borderColor = 'var(--red)';
-        setTimeout(() => document.getElementById('startInput').style.borderColor = '', 1500);
-        toast('Address not found');
-      }
-    }).catch(() => { btn.textContent = 'Set Start'; btn.disabled = false; toast('Geocoding failed'); });
+  try {
+    const result = await geocodeFreeform(val);
+    btn.textContent = 'Set Start'; btn.disabled = false;
+    if (result) {
+      state.startPoint = {lat: result.lat, lng: result.lng, label: result.label || val};
+      saveJSON('routeflow-start', state.startPoint); hideStartModal(); state.durationMatrix = null; render();
+      toast('Start point set');
+    } else {
+      document.getElementById('startInput').style.borderColor = 'var(--red)';
+      setTimeout(() => document.getElementById('startInput').style.borderColor = '', 1500);
+      toast('Address not found');
+    }
+  } catch {
+    btn.textContent = 'Set Start'; btn.disabled = false;
+    toast('Geocoding failed');
+  }
 }
 
 // Bottom sheet

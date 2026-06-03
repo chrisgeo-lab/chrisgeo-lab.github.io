@@ -1,43 +1,172 @@
 import { state } from './state.js';
 
-export const map = L.map('map', {zoomControl: false}).setView([42.5, -71.18], 10);
+const darkQuery = window.matchMedia('(prefers-color-scheme:dark)');
 
-const isDark = window.matchMedia('(prefers-color-scheme:dark)').matches;
-L.tileLayer(isDark
-  ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-  : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-  attribution: '&copy;OpenStreetMap &copy;CARTO', maxZoom: 19
-}).addTo(map);
-setTimeout(() => map.invalidateSize(), 100);
+function getStyle(isDark) {
+  return isDark
+    ? 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json'
+    : 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json';
+}
 
-map.on('movestart', () => { if (state.isNavigating) state.userPanned = true; });
+export const map = new maplibregl.Map({
+  container: 'map',
+  style: getStyle(darkQuery.matches),
+  center: [-71.18, 42.5],
+  zoom: 9,
+  pitch: 0,
+  bearing: 0,
+  attributionControl: false,
+  maxZoom: 19
+});
 
-export let mapLayers = [];
-export function clearMap() { mapLayers.forEach(l => map.removeLayer(l)); mapLayers = []; }
+map.addControl(new maplibregl.AttributionControl({compact: true}), 'bottom-left');
 
-export function addMarker(lat, lng, icon) { const m = L.marker([lat, lng], {icon}).addTo(map); mapLayers.push(m); return m; }
+darkQuery.addEventListener('change', e => {
+  map.setStyle(getStyle(e.matches));
+  map.once('style.load', () => restoreLayers());
+});
+
+map.on('movestart', e => {
+  if (state.isNavigating && e.originalEvent) state.userPanned = true;
+});
+
+let markers = [];
+let popups = [];
+let routeSources = [];
+let sourceCounter = 0;
+
+function restoreLayers() {
+  // After style change, re-add route layers and 3D buildings
+  add3DBuildings();
+}
+
+function add3DBuildings() {
+  if (map.getLayer('3d-buildings')) return;
+  const layers = map.getStyle().layers;
+  const labelLayer = layers.find(l => l.type === 'symbol' && (l.layout || {})['text-field']);
+  const beforeId = labelLayer ? labelLayer.id : undefined;
+
+  if (!map.getSource('carto')) return;
+
+  map.addLayer({
+    id: '3d-buildings',
+    source: 'carto',
+    'source-layer': 'building',
+    type: 'fill-extrusion',
+    minzoom: 14,
+    paint: {
+      'fill-extrusion-color': darkQuery.matches ? '#2c2c2e' : '#ddd',
+      'fill-extrusion-height': [
+        'case',
+        ['has', 'render_height'], ['get', 'render_height'],
+        ['has', 'floors'], ['*', ['get', 'floors'], 3.5],
+        10
+      ],
+      'fill-extrusion-base': ['case', ['has', 'render_min_height'], ['get', 'render_min_height'], 0],
+      'fill-extrusion-opacity': 0.6
+    }
+  }, beforeId);
+}
+
+map.on('style.load', () => {
+  add3DBuildings();
+});
+
+export function clearMap() {
+  markers.forEach(m => m.remove());
+  markers = [];
+  popups.forEach(p => p.remove());
+  popups = [];
+  if (map.isStyleLoaded()) {
+    routeSources.forEach(id => {
+      try {
+        if (map.getLayer(id + '-outline')) map.removeLayer(id + '-outline');
+        if (map.getLayer(id)) map.removeLayer(id);
+        if (map.getSource(id)) map.removeSource(id);
+      } catch {}
+    });
+  }
+  routeSources = [];
+}
+
+export function addMarker(lat, lng, icon) {
+  const el = document.createElement('div');
+  el.innerHTML = icon.html;
+  el.style.cursor = 'pointer';
+  const firstChild = el.firstElementChild;
+  if (firstChild) {
+    el.style.width = firstChild.style.width;
+    el.style.height = firstChild.style.height;
+  }
+  const marker = new maplibregl.Marker({element: el, anchor: 'center'})
+    .setLngLat([lng, lat])
+    .addTo(map);
+  markers.push(marker);
+  marker._el = el;
+  marker._lngLat = [lng, lat];
+  return marker;
+}
 
 export function addPolyline(coords, color, weight = 5) {
-  const n = coords.length;
-  if (n < 2) return null;
-  const segments = Math.min(n - 1, 48);
-  const step = Math.max(1, Math.floor((n - 1) / segments));
-  const outline = L.polyline(coords, {color: '#000', weight: weight + 3, opacity: .1, lineCap: 'round', lineJoin: 'round'}).addTo(map);
-  mapLayers.push(outline);
-  const rgb = hexToRgb(color);
-  for (let i = 0; i < n - 1; i += step) {
-    const end = Math.min(i + step + 1, n);
-    const seg = coords.slice(i, end);
-    if (seg.length < 2) continue;
-    const t = i / (n - 1);
-    const r = Math.round(rgb.r + (255 - rgb.r) * t * 0.6);
-    const g = Math.round(rgb.g + (255 - rgb.g) * t * 0.6);
-    const b = Math.round(rgb.b + (255 - rgb.b) * t * 0.6);
-    const segColor = `rgb(${r},${g},${b})`;
-    const p = L.polyline(seg, {color: segColor, weight, opacity: .85, lineCap: 'round', lineJoin: 'round'}).addTo(map);
-    mapLayers.push(p);
+  if (!coords || coords.length < 2) return null;
+  const id = 'route-' + (++sourceCounter);
+
+  const geojson = {
+    type: 'Feature',
+    geometry: {
+      type: 'LineString',
+      coordinates: coords.map(c => [c[1], c[0]])
+    }
+  };
+
+  if (!map.isStyleLoaded()) {
+    map.once('style.load', () => addRouteLayer(id, geojson, color, weight));
+  } else {
+    addRouteLayer(id, geojson, color, weight);
   }
-  return outline;
+  routeSources.push(id);
+  return id;
+}
+
+function addRouteLayer(id, geojson, color, weight) {
+  map.addSource(id, {type: 'geojson', data: geojson, lineMetrics: true});
+
+  map.addLayer({
+    id: id + '-outline',
+    type: 'line',
+    source: id,
+    paint: {
+      'line-color': '#000',
+      'line-width': weight + 3,
+      'line-opacity': 0.1
+    },
+    layout: {'line-cap': 'round', 'line-join': 'round'}
+  });
+
+  map.addLayer({
+    id: id,
+    type: 'line',
+    source: id,
+    paint: {
+      'line-color': color,
+      'line-width': weight,
+      'line-opacity': 0.85,
+      'line-gradient': [
+        'interpolate', ['linear'], ['line-progress'],
+        0, color,
+        1, lightenColor(color, 0.5)
+      ]
+    },
+    layout: {'line-cap': 'round', 'line-join': 'round'}
+  });
+}
+
+function lightenColor(hex, factor) {
+  const rgb = hexToRgb(hex);
+  const r = Math.min(255, Math.round(rgb.r + (255 - rgb.r) * factor));
+  const g = Math.min(255, Math.round(rgb.g + (255 - rgb.g) * factor));
+  const b = Math.min(255, Math.round(rgb.b + (255 - rgb.b) * factor));
+  return `rgb(${r},${g},${b})`;
 }
 
 export function hexToRgb(hex) {
@@ -47,13 +176,87 @@ export function hexToRgb(hex) {
 }
 
 export function stopIcon(n, color, vis, curr) {
-  const sz = curr ? 24 : 20, op = vis ? .4 : 1;
-  const bdr = curr ? '2px solid #fff' : '1.5px solid rgba(255,255,255,.8)';
+  const sz = curr ? 26 : 22, op = vis ? 0.4 : 1;
+  const bdr = curr ? '2.5px solid #fff' : '1.5px solid rgba(255,255,255,.8)';
   const content = vis ? '&#10003;' : n;
   const glow = curr ? `box-shadow:0 0 0 4px ${color}40,0 2px 8px rgba(0,0,0,.3)` : 'box-shadow:0 2px 6px rgba(0,0,0,.3)';
-  return L.divIcon({html: `<div style="width:${sz}px;height:${sz}px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;font-size:${curr ? 10 : 9}px;color:#fff;${glow};border:${bdr};opacity:${op}">${content}</div>`, iconSize: [sz, sz], iconAnchor: [sz / 2, sz / 2], popupAnchor: [0, -sz / 2], className: ''});
+  return {html: `<div style="width:${sz}px;height:${sz}px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;font-size:${curr ? 11 : 9}px;color:#fff;${glow};border:${bdr};opacity:${op}">${content}</div>`};
 }
 
 export function homeIcon() {
-  return L.divIcon({html: `<div style="width:20px;height:20px;border-radius:50%;background:#FF9500;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;box-shadow:0 2px 6px rgba(255,149,0,.4);border:1.5px solid #fff">&#9750;</div>`, iconSize: [20, 20], iconAnchor: [10, 10], popupAnchor: [0, -10], className: ''});
+  return {html: '<div style="width:22px;height:22px;border-radius:50%;background:#FF9500;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;box-shadow:0 2px 6px rgba(255,149,0,.4);border:1.5px solid #fff">&#9750;</div>'};
 }
+
+export function gpsIcon() {
+  return {html: '<div class="gps-dot"><div class="gps-dot-core"></div><div class="gps-dot-ring"></div></div>'};
+}
+
+// Navigation camera: 3D pitched view following GPS
+export function setNavCamera(lat, lng, bearing, animate = true) {
+  const options = {
+    center: [lng, lat],
+    zoom: 17,
+    pitch: 60,
+    bearing: bearing || 0
+  };
+  if (animate) {
+    map.easeTo({...options, duration: 800});
+  } else {
+    map.jumpTo(options);
+  }
+}
+
+export function resetCamera(animate = true) {
+  const options = {pitch: 0, bearing: 0};
+  if (animate) map.easeTo({...options, duration: 500});
+  else map.jumpTo(options);
+}
+
+// Compatibility layer for existing code
+map.setView = function(latlng, zoom, opts) {
+  const center = Array.isArray(latlng) ? [latlng[1], latlng[0]] : [latlng.lng, latlng.lat];
+  if (opts && opts.animate === false) {
+    map.jumpTo({center, zoom});
+  } else {
+    map.flyTo({center, zoom, duration: opts?.duration ? opts.duration * 1000 : 1000});
+  }
+};
+
+const originalFitBounds = maplibregl.Map.prototype.fitBounds;
+map.fitBounds = function(bounds, opts) {
+  if (Array.isArray(bounds) && bounds.length && Array.isArray(bounds[0])) {
+    const lngLatBounds = new maplibregl.LngLatBounds();
+    bounds.forEach(b => lngLatBounds.extend([b[1], b[0]]));
+    const padding = {};
+    if (opts) {
+      if (opts.padding) {
+        const p = Array.isArray(opts.padding) ? opts.padding : [opts.padding, opts.padding];
+        padding.top = p[0]; padding.bottom = p[0]; padding.left = p[1]; padding.right = p[1];
+      }
+      if (opts.paddingTopLeft) { padding.left = opts.paddingTopLeft[0]; padding.top = opts.paddingTopLeft[1]; }
+      if (opts.paddingBottomRight) { padding.right = opts.paddingBottomRight[0]; padding.bottom = opts.paddingBottomRight[1]; }
+    }
+    return originalFitBounds.call(map, lngLatBounds, {padding, duration: 1000});
+  }
+  return originalFitBounds.call(map, bounds, opts);
+};
+
+map.panTo = function(latlng) {
+  const center = Array.isArray(latlng) ? [latlng[1], latlng[0]] : [latlng.lng, latlng.lat];
+  map.easeTo({center, duration: 500});
+};
+
+map.zoomIn = function() { map.zoomTo(map.getZoom() + 1, {duration: 300}); };
+map.zoomOut = function() { map.zoomTo(map.getZoom() - 1, {duration: 300}); };
+
+map.closePopup = function() { popups.forEach(p => p.remove()); popups = []; };
+
+export function trackPopup(popup) { popups.push(popup); }
+
+// removeLayer compat: old code passes marker objects, MapLibre expects string IDs
+const _nativeRemoveLayer = map.removeLayer.bind(map);
+map.removeLayer = function(obj) {
+  if (typeof obj === 'string') return _nativeRemoveLayer(obj);
+  if (obj && obj.remove) obj.remove();
+};
+

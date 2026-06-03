@@ -1,7 +1,7 @@
 import { state, STORE_V, saveSet } from './state.js';
 import { hd, fmtMi, fmtMiShort, fmtDur, toast, setLoading, esc } from './utils.js';
 import { fetchRoute } from './routing.js';
-import { map, clearMap, addPolyline, addMarker, stopIcon, homeIcon } from './map.js';
+import { map, clearMap, addPolyline, addMarker, stopIcon, homeIcon, gpsIcon, setNavCamera, resetCamera } from './map.js';
 
 export function maneuverIcon(type, mod) {
   const m = {depart: '&#9654;', arrive: '&#9632;', turn: mod?.includes('left') ? '&#8592;' : mod?.includes('right') ? '&#8594;' : '&#8593;', 'new name': '&#8593;', continue: '&#8593;', merge: '&#8599;', 'on ramp': '&#8599;', 'off ramp': '&#8600;', fork: mod?.includes('left') ? '&#8598;' : '&#8599;', 'end of road': mod?.includes('left') ? '&#8592;' : '&#8594;', roundabout: '&#8635;', rotary: '&#8635;'};
@@ -27,6 +27,15 @@ function getDistToPoint(loc) {
   if (!state.gpsPos || !loc) return null;
   const pt = {lat: loc[1], lng: loc[0]};
   return hd(state.gpsPos, pt);
+}
+
+function computeBearing(from, to) {
+  const dLng = (to.lng - from.lng) * Math.PI / 180;
+  const lat1 = from.lat * Math.PI / 180;
+  const lat2 = to.lat * Math.PI / 180;
+  const y = Math.sin(dLng) * Math.cos(lat2);
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+  return ((Math.atan2(y, x) * 180 / Math.PI) + 360) % 360;
 }
 
 export function startNavigation(renderViewFn) {
@@ -92,37 +101,53 @@ async function beginNavigation(renderViewFn) {
   });
   if (state.home) addMarker(state.home.lat, state.home.lng, homeIcon());
 
+  // Add GPS marker
+  state.gpsMarker = addMarker(state.gpsPos.lat, state.gpsPos.lng, gpsIcon());
+
+  // Enter 3D navigation camera
+  const nextStop = state.navRoute.stops[0];
+  const bearing = nextStop ? computeBearing(state.gpsPos, nextStop) : 0;
+  setNavCamera(state.gpsPos.lat, state.gpsPos.lng, bearing);
+
   state.gpsWatchId = navigator.geolocation.watchPosition(
     pos => onGPS(pos, renderViewFn),
     onGPSError,
     {enableHighAccuracy: true, maximumAge: 2000, timeout: 10000}
   );
   updateNavUI();
-  if (state.gpsPos) map.setView([state.gpsPos.lat, state.gpsPos.lng], 15);
 }
 
 export function stopNavigation(renderViewFn, setSheetStateFn) {
   state.isNavigating = false; state.navRoute = null; state.navCurrentLeg = 0; state.navCurrentStep = 0;
+  state.userPanned = false;
   document.body.classList.remove('navigating');
   document.getElementById('navOverlay').classList.remove('active');
   closeNavDirPanel();
   setSheetStateFn('peek');
-  if (state.gpsWatchId !== null) { navigator.geolocation.clearWatch(state.gpsWatchId); state.gpsWatchId = null; }
-  if (state.gpsMarker) { map.removeLayer(state.gpsMarker); state.gpsMarker = null; }
+  if (state.gpsWatchId !== null) {
+    try { navigator.geolocation.clearWatch(state.gpsWatchId); } catch {}
+    state.gpsWatchId = null;
+  }
+  if (state.gpsMarker) { state.gpsMarker.remove(); state.gpsMarker = null; }
   document.getElementById('recenterBtn').classList.remove('show');
+  resetCamera();
   renderViewFn();
 }
 
 function onGPS(pos, renderViewFn) {
   state.gpsPos = {lat: pos.coords.latitude, lng: pos.coords.longitude, acc: pos.coords.accuracy, hdg: pos.coords.heading, spd: pos.coords.speed};
-  if (!state.gpsMarker) {
-    state.gpsMarker = L.marker([state.gpsPos.lat, state.gpsPos.lng], {icon: L.divIcon({html: '<div class="gps-dot"><div class="gps-dot-core"></div><div class="gps-dot-ring"></div></div>', iconSize: [22, 22], iconAnchor: [11, 11], className: ''}), zIndexOffset: 9999}).addTo(map);
-  } else {
-    state.gpsMarker.setLatLng([state.gpsPos.lat, state.gpsPos.lng]);
+
+  if (state.gpsMarker) {
+    state.gpsMarker.setLngLat([state.gpsPos.lng, state.gpsPos.lat]);
   }
+
   if (!state.userPanned) {
-    const zoom = map.getZoom() < 15 ? 16 : map.getZoom();
-    map.setView([state.gpsPos.lat, state.gpsPos.lng], zoom, {animate: true, duration: .5});
+    const nextStop = state.navRoute?.stops?.[state.navCurrentLeg];
+    let bearing = state.gpsPos.hdg;
+    if ((!bearing || isNaN(bearing)) && nextStop) {
+      bearing = computeBearing(state.gpsPos, nextStop);
+    }
+    setNavCamera(state.gpsPos.lat, state.gpsPos.lng, bearing || 0);
   }
   document.getElementById('recenterBtn').classList.toggle('show', state.userPanned);
   advanceNavStep();

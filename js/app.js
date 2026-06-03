@@ -1,5 +1,5 @@
-import { state, STORE_V, saveSet, saveJSON } from './state.js';
-import { toast, setLoading, showError, hideError } from './utils.js';
+import { state, STORE_V, saveSet } from './state.js';
+import { toast, showError, hideError } from './utils.js';
 import { map } from './map.js';
 import { render, renderView, renderStopList, toggleVisited, exportRoute, exportToGoogleMaps, computeMaxClusters,
   showHomeModal, hideHomeModal, confirmHome, showStartModal, hideStartModal, confirmStart,
@@ -25,9 +25,10 @@ function switchMobileView(view) {
   }
 }
 
-// Expose popup toggle globally (needed for marker popup onclick)
 window._popupToggleVisit = function(id) {
-  toggleVisited(id);
+  const numId = parseInt(id, 10);
+  if (!Number.isFinite(numId)) return;
+  toggleVisited(numId);
   map.closePopup();
 };
 
@@ -281,8 +282,22 @@ document.addEventListener('touchend', () => {
 
 // Service Worker
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js').catch(() => {});
+  navigator.serviceWorker.register('sw.js').then(reg => {
+    reg.addEventListener('updatefound', () => {
+      const newWorker = reg.installing;
+      newWorker.addEventListener('statechange', () => {
+        if (newWorker.state === 'activated' && navigator.serviceWorker.controller) {
+          toast('Update available — refresh for latest version');
+        }
+      });
+    });
+  }).catch(() => {});
 }
+
+window.addEventListener('unhandledrejection', e => {
+  console.error('Unhandled promise rejection:', e.reason);
+  e.preventDefault();
+});
 
 // Offline detection
 function updateOnlineStatus() {

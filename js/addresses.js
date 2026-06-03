@@ -1,6 +1,7 @@
 import { state, STORE_SPOTS, STORE_V, STORE_CACHE, saveSet, saveJSON } from './state.js';
 import { esc, toast } from './utils.js';
 import { render, computeMaxClusters } from './ui.js';
+import { geocodeAddress } from './geocoder.js';
 
 let stagedAddresses = [];
 
@@ -236,46 +237,22 @@ function renderAddrPreview() {
   });
 }
 
-// Geocoding
+// Geocoding (uses multi-provider cascade from geocoder.js)
 let geocodeCancelled = false;
-let lastGeoReq = 0;
-const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search';
-
-async function nominatimFetch(query) {
-  const elapsed = Date.now() - lastGeoReq;
-  if (elapsed < 1100) await new Promise(r => setTimeout(r, 1100 - elapsed));
-  lastGeoReq = Date.now();
-  const url = `${NOMINATIM_URL}?format=json&q=${encodeURIComponent(query)}&limit=1&countrycodes=us`;
-  const r = await fetch(url, {headers: {'Accept': 'application/json'}});
-  if (r.status === 429) {
-    await new Promise(r2 => setTimeout(r2, 3000));
-    lastGeoReq = Date.now();
-    const retry = await fetch(url, {headers: {'Accept': 'application/json'}});
-    if (!retry.ok) return null;
-    return retry.json();
-  }
-  if (!r.ok) return null;
-  return r.json();
-}
 
 async function geocodeOne(addr) {
-  const parts = [addr.street, addr.city, addr.state, addr.zip].filter(Boolean);
-  const query = parts.join(', ');
   try {
-    let data = await nominatimFetch(query);
-    if ((!data || !data.length) && /\./.test(query)) {
-      data = await nominatimFetch(query.replace(/\./g, ''));
-    }
-    if ((!data || !data.length) && addr.zip) {
-      const noZip = [addr.street, addr.city, addr.state].filter(Boolean).join(', ');
-      data = await nominatimFetch(noZip.replace(/\./g, ''));
-    }
-    if (data && data.length) {
-      addr.lat = parseFloat(data[0].lat);
-      addr.lng = parseFloat(data[0].lon);
+    const result = await geocodeAddress(addr);
+    if (result) {
+      addr.lat = result.lat;
+      addr.lng = result.lng;
       addr.status = 'ok';
-    } else { addr.status = 'error'; }
-  } catch { addr.status = 'error'; }
+    } else {
+      addr.status = 'error';
+    }
+  } catch {
+    addr.status = 'error';
+  }
 }
 
 async function geocodeStaged() {

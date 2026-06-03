@@ -11,14 +11,15 @@ export function trimCache() {
   }
 }
 
-async function fetchWithRetry(url, retries = 2, delay = 1000) {
+async function fetchWithRetry(url, retries = 2, delay = 1000, signal) {
   for (let i = 0; i <= retries; i++) {
     try {
-      const r = await fetch(url);
+      const r = await fetch(url, signal ? {signal} : undefined);
       if (r.ok) return r;
       if (r.status >= 500 && i < retries) { await new Promise(w => setTimeout(w, delay * (i + 1))); continue; }
       throw new Error(`HTTP ${r.status}`);
     } catch (e) {
+      if (e.name === 'AbortError') throw e;
       if (i === retries) throw e;
       await new Promise(w => setTimeout(w, delay * (i + 1)));
     }

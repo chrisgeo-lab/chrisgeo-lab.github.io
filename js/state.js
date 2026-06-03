@@ -20,7 +20,10 @@ export function saveSet(k, s) { localStorage.setItem(k, JSON.stringify([...s]));
 export function saveJSON(k, v) {
   try { localStorage.setItem(k, JSON.stringify(v)); }
   catch(e) {
-    if (e.name === 'QuotaExceededError') { evictCache(); try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+    if (e.name === 'QuotaExceededError' || e.code === 22) {
+      evictCache();
+      try { localStorage.setItem(k, JSON.stringify(v)); } catch {}
+    }
   }
 }
 
