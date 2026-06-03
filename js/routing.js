@@ -15,20 +15,23 @@ function getProfile() {
   return OSRM_PROFILES[state.travelMode] || OSRM_PROFILES.car;
 }
 
-async function fetchWithRetry(url, retries = 2, delay = 2000, signal) {
+async function fetchWithRetry(url, retries = 1, delay = 1500) {
   for (let i = 0; i <= retries; i++) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
     try {
-      const r = await fetch(url, signal ? {signal} : undefined);
+      const r = await fetch(url, {signal: controller.signal});
+      clearTimeout(timeout);
       if (r.ok) return r;
       if ((r.status === 429 || r.status >= 500) && i < retries) {
-        await new Promise(w => setTimeout(w, delay * (i + 1)));
+        await new Promise(w => setTimeout(w, delay));
         continue;
       }
       throw new Error(`HTTP ${r.status}`);
     } catch (e) {
-      if (e.name === 'AbortError') throw e;
+      clearTimeout(timeout);
       if (i === retries) throw e;
-      await new Promise(w => setTimeout(w, delay * (i + 1)));
+      await new Promise(w => setTimeout(w, delay));
     }
   }
 }
@@ -131,11 +134,13 @@ export async function getFullDurationMatrix(renderFn) {
     console.warn('OSRM table failed, using haversine fallback:', e.message);
     state.durationMatrix = buildHaversineMatrix(state.SPOTS);
     state.matrixFallback = true;
-    showError('Using approximate distances — routing server unavailable', () => {
-      state.durationMatrix = null;
-      state.matrixFallback = false;
-      renderFn();
-    });
+    if (state.SPOTS.length > 10) {
+      showError('Using approximate distances — routing server unavailable', () => {
+        state.durationMatrix = null;
+        state.matrixFallback = false;
+        renderFn();
+      });
+    }
   }
   return state.durationMatrix;
 }

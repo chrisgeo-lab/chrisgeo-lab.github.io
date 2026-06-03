@@ -186,19 +186,16 @@ export function gpsIcon() {
   return {html: '<div class="gps-dot"><div class="gps-dot-core"></div><div class="gps-dot-ring"></div></div>'};
 }
 
-
-// Compatibility layer for existing code
-map.setView = function(latlng, zoom, opts) {
+export function setView(latlng, zoom, opts) {
   const center = Array.isArray(latlng) ? [latlng[1], latlng[0]] : [latlng.lng, latlng.lat];
   if (opts && opts.animate === false) {
     map.jumpTo({center, zoom});
   } else {
     map.flyTo({center, zoom, duration: opts?.duration ? opts.duration * 1000 : 1000});
   }
-};
+}
 
-const originalFitBounds = maplibregl.Map.prototype.fitBounds;
-map.fitBounds = function(bounds, opts) {
+export function fitBounds(bounds, opts) {
   if (Array.isArray(bounds) && bounds.length && Array.isArray(bounds[0])) {
     const lngLatBounds = new maplibregl.LngLatBounds();
     bounds.forEach(b => lngLatBounds.extend([b[1], b[0]]));
@@ -211,19 +208,13 @@ map.fitBounds = function(bounds, opts) {
       if (opts.paddingTopLeft) { padding.left = opts.paddingTopLeft[0]; padding.top = opts.paddingTopLeft[1]; }
       if (opts.paddingBottomRight) { padding.right = opts.paddingBottomRight[0]; padding.bottom = opts.paddingBottomRight[1]; }
     }
-    return originalFitBounds.call(map, lngLatBounds, {padding, duration: 1000});
+    map.fitBounds(lngLatBounds, {padding, duration: 1000});
+  } else {
+    map.fitBounds(bounds, opts);
   }
-  return originalFitBounds.call(map, bounds, opts);
-};
+}
 
-map.panTo = function(latlng) {
-  const center = Array.isArray(latlng) ? [latlng[1], latlng[0]] : [latlng.lng, latlng.lat];
-  map.easeTo({center, duration: 500});
-};
-
-map.zoomIn = function() { map.zoomTo(map.getZoom() + 1, {duration: 300}); };
-map.zoomOut = function() { map.zoomTo(map.getZoom() - 1, {duration: 300}); };
-
-map.closePopup = function() { popups.forEach(p => p.remove()); popups = []; };
-
+export function zoomIn() { map.zoomTo(map.getZoom() + 1, {duration: 300}); }
+export function zoomOut() { map.zoomTo(map.getZoom() - 1, {duration: 300}); }
+export function closePopup() { popups.forEach(p => p.remove()); popups = []; }
 export function trackPopup(popup) { popups.push(popup); }

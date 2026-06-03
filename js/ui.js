@@ -2,7 +2,7 @@ import { state, COLORS, STOP_MIN, STORE_V, STORE_SPOTS, saveSet, getStartLocatio
 import { esc, hd, fmtMi, fmtTime, fmtDur, toast, setLoading, showError, hideError } from './utils.js';
 import { fetchTable, fetchRoute, buildHaversineMatrix, getFullDurationMatrix } from './routing.js';
 import { clusterUnvisited, tspWithMatrix } from './solver.js';
-import { map, clearMap, addMarker, addPolyline, stopIcon, homeIcon, gpsIcon, trackPopup } from './map.js';
+import { map, clearMap, addMarker, addPolyline, stopIcon, homeIcon, gpsIcon, trackPopup, setView, fitBounds, closePopup } from './map.js';
 
 let gpsMarker = null;
 
@@ -70,7 +70,9 @@ export async function render() {
     renderView();
   } catch (e) {
     console.error('Routing failed:', e);
-    showError('Route calculation failed — using approximate distances', () => { state.durationMatrix = null; render(); });
+    state.currentRoutes = [];
+    renderView();
+    showError('Route calculation failed — check connection and retry', () => { state.durationMatrix = null; render(); });
   } finally {
     if (ver === state.renderVer) setLoading(false);
   }
@@ -81,7 +83,7 @@ function bindPopup(marker, html) {
   if (!el) return;
   el.addEventListener('click', e => {
     e.stopPropagation();
-    map.closePopup();
+    closePopup();
     const popup = new maplibregl.Popup({maxWidth: '220px', className: 'stop-popup-wrap', offset: 12})
       .setLngLat(marker.getLngLat())
       .setHTML(html)
@@ -145,7 +147,7 @@ export function renderView() {
   if (bounds.length && !state.suppressFitBounds) {
     const isDesktop = window.innerWidth >= 768;
     const padding = isDesktop ? {paddingTopLeft: [60, 80], paddingBottomRight: [420, 60]} : {padding: [60, 220]};
-    map.fitBounds(bounds, padding);
+    fitBounds(bounds, padding);
   }
   state.suppressFitBounds = false;
 
@@ -276,7 +278,7 @@ export function renderStopList() {
     if (origin && rd.legs && rd.legs.length > 0) {
       const hi = document.createElement('div'); hi.className = 'stop-item is-home';
       hi.innerHTML = `<div class="stop-item-num" style="background:#007AFF">&#9654;</div><div class="stop-item-info"><div class="stop-item-name">${esc(origin.label) || 'Current Location'}</div><div class="stop-item-detail"><span>Start</span><span>${fmtMi(rd.legs[0].distance)} mi to first stop</span></div></div>`;
-      hi.onclick = () => map.setView([origin.lat, origin.lng], 15);
+      hi.onclick = () => setView([origin.lat, origin.lng], 15);
       el.appendChild(hi);
     }
     const spots = rd.route.map(i => typeof i === 'number' ? state.SPOTS[i] : i);
@@ -297,7 +299,7 @@ export function renderStopList() {
         </div>`;
       item.style.animationDelay = `${i * 30}ms`;
       item.querySelector('.stop-item-check').onclick = (e) => { e.stopPropagation(); toggleVisited(spot.id); };
-      item.onclick = () => map.setView([spot.lat, spot.lng], 16);
+      item.onclick = () => setView([spot.lat, spot.lng], 16);
       el.appendChild(item);
       if (curr && !query) setTimeout(() => item.scrollIntoView({behavior: 'smooth', block: 'center'}), 300);
     });
@@ -305,7 +307,7 @@ export function renderStopList() {
       const hi = document.createElement('div'); hi.className = 'stop-item is-home';
       const lastLeg = rd.legs[rd.legs.length - 1];
       hi.innerHTML = `<div class="stop-item-num" style="background:#FF9500">&#9750;</div><div class="stop-item-info"><div class="stop-item-name">${esc(state.home.label)}</div><div class="stop-item-detail"><span>Return to End</span><span>${fmtMi(lastLeg.distance)} mi · ${fmtDur(lastLeg.duration)} from last stop</span></div></div>`;
-      hi.onclick = () => map.setView([state.home.lat, state.home.lng], 15);
+      hi.onclick = () => setView([state.home.lat, state.home.lng], 15);
       el.appendChild(hi);
     }
   });
@@ -328,7 +330,7 @@ export function renderStopList() {
           <div class="stop-item-detail"><span>${esc(spot.city)}${spot.state ? ', ' + esc(spot.state) : ''}</span></div>
         </div>`;
       item.querySelector('.stop-item-check').onclick = (e) => { e.stopPropagation(); toggleVisited(spot.id); };
-      item.onclick = () => map.setView([spot.lat, spot.lng], 16);
+      item.onclick = () => setView([spot.lat, spot.lng], 16);
       el.appendChild(item);
     });
   }

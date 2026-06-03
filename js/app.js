@@ -1,6 +1,6 @@
-import { state, STORE_V, saveSet, saveJSON, getStartLocation } from './state.js';
+import { state, STORE_V, saveSet, saveJSON } from './state.js';
 import { toast, showError, hideError } from './utils.js';
-import { map } from './map.js';
+import { setView, zoomIn, zoomOut, closePopup } from './map.js';
 import { render, renderView, renderStopList, toggleVisited, computeMaxClusters,
   setSheetState, toggleRouteDropdown, closeRouteDropdown } from './ui.js';
 import { exportRoute, exportToGoogleMaps, exportToAppleMaps } from './exports.js';
@@ -30,7 +30,7 @@ window._popupToggleVisit = function(id) {
   const numId = parseInt(id, 10);
   if (!Number.isFinite(numId)) return;
   toggleVisited(numId);
-  map.closePopup();
+  closePopup();
 };
 
 // Route dropdown
@@ -77,25 +77,15 @@ document.getElementById('panelToggle').onclick = () => {
 };
 
 // Map controls
-document.getElementById('zoomInBtn').onclick = () => map.zoomIn();
-document.getElementById('zoomOutBtn').onclick = () => map.zoomOut();
-document.getElementById('fitBoundsBtn').onclick = () => {
-  const routes = state.activeFilter >= 0 ? [state.currentRoutes[state.activeFilter]] : state.currentRoutes;
-  const bounds = [];
-  routes.forEach(r => r.route.forEach(i => { const sp = typeof i === 'number' ? state.SPOTS[i] : i; bounds.push([sp.lat, sp.lng]); }));
-  const origin = getStartLocation();
-  if (origin) bounds.push([origin.lat, origin.lng]);
-  if (state.home) bounds.push([state.home.lat, state.home.lng]);
-  if (!bounds.length) { const all = state.SPOTS.map(s => [s.lat, s.lng]); if (all.length) map.fitBounds(all, {padding: [60, 60]}); return; }
-  map.fitBounds(bounds, {padding: [60, 60]});
-};
+document.getElementById('zoomInBtn').onclick = () => zoomIn();
+document.getElementById('zoomOutBtn').onclick = () => zoomOut();
 document.getElementById('gpsLocBtn').onclick = () => {
-  if (state.gpsPos) { map.setView([state.gpsPos.lat, state.gpsPos.lng], 15); return; }
+  if (state.gpsPos) { setView([state.gpsPos.lat, state.gpsPos.lng], 15); return; }
   if (!navigator.geolocation) { toast('GPS not available'); return; }
   toast('Getting location...');
   navigator.geolocation.getCurrentPosition(pos => {
     state.gpsPos = {lat: pos.coords.latitude, lng: pos.coords.longitude, acc: pos.coords.accuracy};
-    map.setView([state.gpsPos.lat, state.gpsPos.lng], 15);
+    setView([state.gpsPos.lat, state.gpsPos.lng], 15);
     state.suppressFitBounds = true;
     renderView();
   }, () => toast('Location unavailable — check permissions'), {enableHighAccuracy: true, timeout: 10000});
@@ -108,9 +98,6 @@ document.getElementById('toggleVisitedBtn').onclick = () => {
   renderView();
 };
 
-// Export buttons
-document.getElementById('exportBtn').onclick = exportToGoogleMaps;
-document.getElementById('exportTxtBtn').onclick = exportRoute;
 document.getElementById('tourBtn').onclick = () => { resetTour(); startTour(render); };
 
 // Keyboard shortcuts
@@ -127,8 +114,8 @@ document.addEventListener('keydown', e => {
   else if (e.key === 'r' || e.key === 'R') { document.getElementById('resetBtn').click(); }
   else if (e.key === 'e') exportToGoogleMaps();
   else if (e.key === 'E') exportRoute();
-  else if (e.key === '=' || e.key === '+') map.zoomIn();
-  else if (e.key === '-') map.zoomOut();
+  else if (e.key === '=' || e.key === '+') zoomIn();
+  else if (e.key === '-') zoomOut();
   else if (e.key === '?') { resetTour(); startTour(render); }
   else if (e.key >= '1' && e.key <= '9') {
     const idx = parseInt(e.key) - 1;
@@ -278,8 +265,12 @@ document.querySelectorAll('.travel-mode-btn').forEach(btn => {
     saveJSON('routeflow-travel-mode', mode);
     document.querySelectorAll('.travel-mode-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
+    const modeLabels = {car: 'Drive', bike: 'Bike', walk: 'Walk'};
+    const timeLabel = document.querySelector('#routeSummary .route-stat:nth-child(2) .route-stat-label');
+    if (timeLabel) timeLabel.textContent = modeLabels[mode] || 'Drive';
     state.durationMatrix = null;
     state.osrmCache = {};
+    state.currentRoutes = [];
     render();
     const labels = {car: 'Driving', bike: 'Cycling', walk: 'Walking'};
     toast(`Switched to ${labels[mode]} mode`);
@@ -323,15 +314,22 @@ function updateOnlineStatus() {
 window.addEventListener('online', updateOnlineStatus);
 window.addEventListener('offline', updateOnlineStatus);
 
-// Init
+// Init GPS (silent — no toast or prompt if permission already granted/denied)
 if (navigator.geolocation) {
-  navigator.geolocation.getCurrentPosition(pos => {
-    state.gpsPos = {lat: pos.coords.latitude, lng: pos.coords.longitude, acc: pos.coords.accuracy};
-    if (!state.startPoint && state.SPOTS.length) { state.durationMatrix = null; render(); }
-    else { state.suppressFitBounds = true; renderView(); }
-  }, () => {
-    toast('GPS unavailable — using default route start');
-  }, {enableHighAccuracy: true, timeout: 10000});
+  navigator.permissions?.query({name: 'geolocation'}).then(result => {
+    if (result.state === 'denied') return;
+    navigator.geolocation.getCurrentPosition(pos => {
+      state.gpsPos = {lat: pos.coords.latitude, lng: pos.coords.longitude, acc: pos.coords.accuracy};
+      if (!state.startPoint && state.SPOTS.length) { state.durationMatrix = null; render(); }
+      else { state.suppressFitBounds = true; renderView(); }
+    }, () => {}, {enableHighAccuracy: false, timeout: 5000});
+  }).catch(() => {
+    navigator.geolocation.getCurrentPosition(pos => {
+      state.gpsPos = {lat: pos.coords.latitude, lng: pos.coords.longitude, acc: pos.coords.accuracy};
+      if (!state.startPoint && state.SPOTS.length) { state.durationMatrix = null; render(); }
+      else { state.suppressFitBounds = true; renderView(); }
+    }, () => {}, {enableHighAccuracy: false, timeout: 5000});
+  });
 }
 if (!navigator.onLine) updateOnlineStatus();
 document.getElementById('progressBar').style.width = `${state.SPOTS.length ? (state.visitedSet.size / state.SPOTS.length) * 100 : 0}%`;
