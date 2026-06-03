@@ -1,4 +1,4 @@
-const CACHE_NAME = 'routeflow-v6';
+const CACHE_NAME = 'routeflow-v7';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -11,9 +11,9 @@ const STATIC_ASSETS = [
   './js/solver.js',
   './js/map.js',
   './js/ui.js',
-  './js/nav.js',
   './js/addresses.js',
   './js/geocoder.js',
+  './js/tour.js',
   'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js',
   'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css'
 ];

@@ -40,9 +40,10 @@
   <button class="map-ctrl-btn" id="manageStopsBtn" title="Import stops" aria-label="Import or manage stop addresses">&#8862;</button>
   <button class="map-ctrl-btn" id="exportBtn" title="Open in Google Maps" aria-label="Open route in Google Maps">&#9656;</button>
   <button class="map-ctrl-btn" id="exportTxtBtn" title="Export as text file" aria-label="Export route as text file">&#8681;</button>
+  <button class="map-ctrl-btn" id="tourBtn" title="Show tour" aria-label="Show guided tour">?</button>
 </div>
 
-<div class="kbd-hint">Esc: Close &middot; N: Navigate &middot; H: End Point &middot; +/-: Zoom &middot; 1-9: Route</div>
+<div class="kbd-hint">Esc: Close &middot; H: End Point &middot; +/-: Zoom &middot; 1-9: Route &middot; ?: Tour</div>
 
 <!-- Top bar -->
 <div class="top-bar">
@@ -75,16 +76,21 @@
       <span id="nextStopTime">--</span>
     </div>
     <div class="next-stop-actions">
-      <button class="nav-btn nav-btn-primary nav-btn-wide" id="startNavBtn" aria-label="Start GPS navigation">&#9654; Navigate</button>
       <button class="nav-btn nav-btn-secondary" id="setStartBtn" aria-label="Set route start point" title="Default: your GPS location">Start</button>
       <button class="nav-btn nav-btn-secondary" id="setHomeBtn" aria-label="Set route end point" title="Optional: route ends at last stop if not set">End</button>
     </div>
   </div>
   <div id="gmapsExportCard" style="margin:0 16px 10px;display:none">
-    <button id="gmapsFullRouteBtn" class="gmaps-btn">
-      <span style="font-size:18px">&#9656;</span>
-      Open Full Route in Google Maps
-    </button>
+    <div style="display:flex;gap:8px">
+      <button id="gmapsFullRouteBtn" class="gmaps-btn" style="flex:1">
+        <span style="font-size:18px">&#9656;</span>
+        Google Maps
+      </button>
+      <button id="appleMapsBtn" class="apple-maps-btn" style="flex:1">
+        <span style="font-size:18px">&#9656;</span>
+        Apple Maps
+      </button>
+    </div>
   </div>
   <div class="route-summary" id="routeSummary" style="display:none">
     <div class="route-summary-stats">
@@ -123,42 +129,6 @@
   </div>
 </div>
 
-<!-- Navigation directions panel -->
-<div class="nav-dir-panel" id="navDirPanel">
-  <div class="nav-dir-header">
-    <span class="nav-dir-title">Directions</span>
-    <button class="nav-dir-close" id="navDirClose" aria-label="Close directions">&times;</button>
-  </div>
-  <div class="nav-dir-content" id="navDirContent"></div>
-</div>
-
-<!-- Navigation overlay -->
-<div class="nav-overlay" id="navOverlay">
-  <div class="nav-instruction" id="navInstruction">
-    <div class="nav-maneuver-icon" id="navIcon">&#8593;</div>
-    <div class="nav-maneuver-info">
-      <div class="nav-maneuver-dist" id="navDist">--</div>
-      <div class="nav-maneuver-text" id="navText">Calculating route...</div>
-    </div>
-    <button class="nav-close" id="navClose" aria-label="Stop navigation">&times;</button>
-  </div>
-  <div class="nav-bottom" id="navBottom">
-    <div class="nav-eta">
-      <div class="nav-eta-time" id="navEta">--</div>
-      <div class="nav-eta-detail" id="navEtaDetail">to next stop</div>
-    </div>
-    <div class="nav-next-stop">
-      <div class="nav-next-label">Next Stop</div>
-      <div class="nav-next-name" id="navNextName">--</div>
-    </div>
-    <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
-      <button class="nav-btn nav-btn-primary" id="navMarkArrived" aria-label="Mark current stop as arrived">&#10003; Arrived</button>
-      <button class="nav-btn nav-btn-secondary nav-btn-sm" id="navShowDirs" aria-label="Show step-by-step directions">Directions</button>
-    </div>
-  </div>
-</div>
-
-<button class="recenter-btn" id="recenterBtn" aria-label="Re-center map on GPS position">&#9737;</button>
 <button class="fab-add-stops" id="fabAddStops" aria-label="Add stops to plan route">&#43; Add Stops</button>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 

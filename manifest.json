@@ -1,22 +1,33 @@
 {
+  "id": "/",
   "name": "RouteFlow - Multi-Stop Route Planner",
   "short_name": "RouteFlow",
-  "description": "Plan and optimize multi-stop routes with real-time navigation",
+  "description": "Plan and optimize multi-stop routes with clustering, turn-by-turn navigation, and offline support.",
   "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#000000",
   "theme_color": "#007AFF",
-  "orientation": "portrait-primary",
+  "orientation": "any",
+  "categories": ["navigation", "productivity", "utilities"],
   "icons": [
     {
       "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='40' fill='%23007AFF'/><path d='M96 30 L140 80 L120 80 L120 150 L72 150 L72 80 L52 80 Z' fill='white' opacity='0.9'/><circle cx='96' cy='110' r='12' fill='%23007AFF'/></svg>",
       "sizes": "192x192",
-      "type": "image/svg+xml"
+      "type": "image/svg+xml",
+      "purpose": "any"
     },
     {
       "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='100' fill='%23007AFF'/><path d='M256 60 L380 200 L320 200 L320 420 L192 420 L192 200 L132 200 Z' fill='white' opacity='0.9'/><circle cx='256' cy='300' r='35' fill='%23007AFF'/></svg>",
       "sizes": "512x512",
-      "type": "image/svg+xml"
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' fill='%23007AFF'/><path d='M256 60 L380 200 L320 200 L320 420 L192 420 L192 200 L132 200 Z' fill='white' opacity='0.9'/><circle cx='256' cy='300' r='35' fill='%23007AFF'/></svg>",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
     }
   ]
 }
