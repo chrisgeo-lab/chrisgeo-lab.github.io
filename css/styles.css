@@ -511,6 +511,31 @@ body{
 .modal-btn-danger:hover{background:rgba(255,59,48,.08)}
 .modal-btn-sm{font-size:12px;padding:8px 14px}
 
+/* Point mode tabs (Start/End modals) */
+.point-mode-tabs{
+  display:flex;gap:4px;margin-bottom:16px
+}
+.point-mode-tab{
+  flex:1;padding:10px 8px;font-size:12px;font-weight:600;text-align:center;
+  background:var(--fill);border:none;cursor:pointer;color:var(--secondary);
+  border-radius:8px;transition:all .15s;font-family:var(--font)
+}
+.point-mode-tab.active{background:var(--blue);color:#fff;box-shadow:0 2px 8px rgba(0,122,255,.25)}
+.point-mode-tab:hover:not(.active){background:var(--separator);color:var(--text)}
+.point-mode-tab:active{transform:scale(.96)}
+.point-mode-content{margin-bottom:4px}
+.point-mode-section{display:none}
+.point-mode-section.active{display:block}
+.point-mode-hint{font-size:13px;color:var(--secondary);padding:8px 0;line-height:1.5}
+.point-stop-list{max-height:180px;overflow-y:auto;border:1px solid var(--separator);border-radius:10px}
+.point-stop-item{
+  padding:12px 14px;cursor:pointer;border-bottom:1px solid var(--separator);
+  font-size:14px;color:var(--text);transition:background .1s
+}
+.point-stop-item:last-child{border-bottom:none}
+.point-stop-item:hover{background:var(--fill)}
+.point-stop-item.selected{background:rgba(0,122,255,.08);color:var(--blue);font-weight:600}
+
 /* Loading */
 .loading-indicator{
   position:fixed;top:0;left:0;right:0;height:3px;z-index:3000;
