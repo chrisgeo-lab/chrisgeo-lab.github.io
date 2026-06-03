@@ -1,82 +1,9 @@
-import { state, COLORS, STOP_MIN, STORE_V, STORE_SPOTS, saveSet, getStartLocation, getActiveRoutes } from './state.js';
-import { esc, hd, fmtMi, fmtTime, fmtDur, toast, setLoading, showError, hideError } from './utils.js';
-import { fetchTable, fetchRoute, buildHaversineMatrix, getFullDurationMatrix } from './routing.js';
-import { clusterUnvisited, tspWithMatrix } from './solver.js';
+import { state, STOP_MIN, STORE_V, STORE_SPOTS, saveSet, getStartLocation, getActiveRoutes } from './state.js';
+import { esc, fmtMi, fmtTime, fmtDur, toast } from './utils.js';
 import { map, clearMap, addMarker, addPolyline, stopIcon, homeIcon, gpsIcon, trackPopup, setView, fitBounds, closePopup } from './map.js';
+export { render } from './planner.js';
 
 let gpsMarker = null;
-
-async function solveRoute(spotIndices, color, name, matrix) {
-  let orderedIndices;
-  const origin = getStartLocation();
-  const anchor = origin || state.home;
-
-  if (anchor) {
-    const pts = [anchor, ...spotIndices.map(i => state.SPOTS[i])];
-    let localMatrix;
-    try { const tbl = await fetchTable(pts); localMatrix = tbl.durations; }
-    catch { localMatrix = buildHaversineMatrix(pts); }
-    const n = pts.length;
-    const order = tspWithMatrix([...Array(n).keys()], localMatrix, 0);
-    orderedIndices = order.filter(i => i !== 0).map(i => spotIndices[i - 1]);
-  } else {
-    orderedIndices = tspWithMatrix(spotIndices, matrix, spotIndices[0]);
-  }
-
-  const waypoints = [...(origin ? [origin] : []), ...orderedIndices.map(i => state.SPOTS[i]), ...(state.home ? [state.home] : [])];
-
-  let routeResult;
-  try {
-    routeResult = await fetchRoute(waypoints);
-  } catch (e) {
-    console.warn('Route fetch failed:', e);
-    const coords = waypoints.map(p => [p.lng, p.lat]);
-    let totalDist = 0; for (let i = 0; i < waypoints.length - 1; i++) totalDist += hd(waypoints[i], waypoints[i + 1]);
-    return {route: orderedIndices, color, name, geometry: {type: 'LineString', coordinates: coords}, legs: null, totalMiles: totalDist, totalMinutes: (totalDist / 25) * 60};
-  }
-
-  return {route: orderedIndices, color, name, geometry: routeResult.geometry, legs: routeResult.legs, totalMiles: routeResult.distance * 0.000621371, totalMinutes: routeResult.duration / 60};
-}
-
-export async function render() {
-  const ver = ++state.renderVer;
-  if (!state.SPOTS.length) {
-    state.currentRoutes = []; renderView(); return;
-  }
-  const unvisitedIndices = state.SPOTS.map((_, i) => i).filter(i => !state.visitedSet.has(state.SPOTS[i].id));
-  if (!unvisitedIndices.length) {
-    state.currentRoutes = []; renderView(); setLoading(false); return;
-  }
-  setLoading(true);
-  hideError();
-  try {
-    const matrix = await getFullDurationMatrix(render);
-    if (ver !== state.renderVer) return;
-    const k = Math.min(state.numClusters, unvisitedIndices.length);
-    const clusters = clusterUnvisited(unvisitedIndices, k, matrix);
-
-    const results = [];
-    for (let ci = 0; ci < clusters.length; ci++) {
-      if (ver !== state.renderVer) return;
-      const col = COLORS[ci % COLORS.length];
-      const rname = state.numClusters === 1 ? 'Full Route' : `Route ${ci + 1}`;
-      const result = await solveRoute(clusters[ci], col, rname, matrix);
-      results.push(result);
-    }
-
-    if (ver !== state.renderVer) return;
-    state.currentRoutes = results;
-    if (state.activeFilter >= state.currentRoutes.length) state.activeFilter = -1;
-    renderView();
-  } catch (e) {
-    console.error('Routing failed:', e);
-    state.currentRoutes = [];
-    renderView();
-    showError('Route calculation failed — check connection and retry', () => { state.durationMatrix = null; render(); });
-  } finally {
-    if (ver === state.renderVer) setLoading(false);
-  }
-}
 
 function bindPopup(marker, html) {
   const el = marker._el || marker.getElement();
@@ -116,7 +43,7 @@ export function renderView() {
       const addr = [spot.city, spot.state, spot.zip].filter(Boolean).join(', ');
       let popup = `<div class="stop-popup"><div class="stop-popup-label" style="color:${rd.color}">Stop ${i + 1}</div><div class="stop-popup-street">${esc(spot.street)}</div>${addr ? `<div class="stop-popup-addr">${esc(addr)}</div>` : ''}`;
       if (legInfo) popup += `<div class="stop-popup-leg">${fmtMi(legInfo.distance)} mi · ${fmtDur(legInfo.duration)} from ${i === 0 ? 'start' : 'prev'}</div>`;
-      popup += `<button class="stop-popup-btn stop-popup-btn-visit" onclick="window._popupToggleVisit(${sid})">&#10003; Mark Visited</button></div>`;
+      popup += `<button class="stop-popup-btn stop-popup-btn-visit" data-visit-id="${sid}">&#10003; Mark Visited</button></div>`;
       bindPopup(mk, popup);
       bounds.push([spot.lat, spot.lng]);
     });
@@ -126,7 +53,7 @@ export function renderView() {
       const mk = addMarker(spot.lat, spot.lng, stopIcon('&#10003;', '#aeaeb2', true, false));
       const addr = [spot.city, spot.state, spot.zip].filter(Boolean).join(', ');
       let popup = `<div class="stop-popup"><div class="stop-popup-label" style="color:#aeaeb2">Visited</div><div class="stop-popup-street">${esc(spot.street)}</div>${addr ? `<div class="stop-popup-addr">${esc(addr)}</div>` : ''}`;
-      popup += `<button class="stop-popup-btn stop-popup-btn-unvisit" onclick="window._popupToggleVisit(${spot.id})">Mark Unvisited</button></div>`;
+      popup += `<button class="stop-popup-btn stop-popup-btn-unvisit" data-visit-id="${spot.id}">Mark Unvisited</button></div>`;
       bindPopup(mk, popup);
     });
   }
@@ -282,17 +209,19 @@ export function renderStopList() {
       el.appendChild(hi);
     }
     const spots = rd.route.map(i => typeof i === 'number' ? state.SPOTS[i] : i);
-    const firstUnvisited = spots.findIndex(s => !state.visitedSet.has((typeof s === 'number' ? state.SPOTS[s] : s).id));
-    spots.forEach((s, i) => {
+    const unvisitedSpots = spots.filter(s => !state.visitedSet.has((typeof s === 'number' ? state.SPOTS[s] : s).id));
+    let stopNum = 0;
+    unvisitedSpots.forEach((s, i) => {
       const spot = typeof s === 'number' ? state.SPOTS[s] : s;
       if (query && !spot.street.toLowerCase().includes(query) && !spot.city.toLowerCase().includes(query)) return;
-      const curr = i === firstUnvisited || (firstUnvisited === -1 && i === 0);
-      const leg = rd.legs ? rd.legs[(getStartLocation() ? 1 : 0) + i] : null;
+      stopNum++;
+      const curr = i === 0;
+      const leg = rd.legs ? rd.legs[(getStartLocation() ? 1 : 0) + spots.indexOf(s)] : null;
       const item = document.createElement('div');
       item.className = 'stop-item' + (curr ? ' current' : '');
       item.innerHTML = `
         <div class="stop-item-check" role="checkbox" tabindex="0" aria-checked="false" aria-label="Mark ${esc(spot.street)} as visited"></div>
-        <div class="stop-item-num" style="background:${rd.color}">${i + 1}</div>
+        <div class="stop-item-num" style="background:${rd.color}">${stopNum}</div>
         <div class="stop-item-info">
           <div class="stop-item-name">${esc(spot.street)}</div>
           <div class="stop-item-detail"><span>${esc(spot.city)}${spot.state ? ', ' + esc(spot.state) : ''}</span>${leg ? `<span>${fmtMi(leg.distance)} mi · ${fmtDur(leg.duration)}</span>` : ''}</div>
@@ -324,7 +253,6 @@ export function renderStopList() {
       item.className = 'stop-item visited';
       item.innerHTML = `
         <div class="stop-item-check" role="checkbox" tabindex="0" aria-checked="true" aria-label="Mark ${esc(spot.street)} as not visited">&#10003;</div>
-        <div class="stop-item-num" style="background:var(--tertiary)">✓</div>
         <div class="stop-item-info">
           <div class="stop-item-name">${esc(spot.street)}</div>
           <div class="stop-item-detail"><span>${esc(spot.city)}${spot.state ? ', ' + esc(spot.state) : ''}</span></div>
@@ -349,7 +277,7 @@ export function toggleVisited(id) {
 }
 
 function celebrate() {
-  toast('All stops complete! Great work!');
+  toast('All stops done!');
   if (navigator.vibrate) navigator.vibrate([100, 80, 100, 80, 200]);
 }
 
@@ -401,3 +329,10 @@ export function setSheetState(s) {
   if (s === 'collapsed') sheet.classList.add('collapsed');
   else if (s === 'expanded') sheet.classList.add('expanded');
 }
+
+document.addEventListener('click', e => {
+  const btn = e.target.closest('[data-visit-id]');
+  if (!btn) return;
+  const id = parseInt(btn.dataset.visitId, 10);
+  if (Number.isFinite(id)) { toggleVisited(id); closePopup(); }
+});

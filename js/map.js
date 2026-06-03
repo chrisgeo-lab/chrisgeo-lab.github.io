@@ -28,11 +28,12 @@ darkQuery.addEventListener('change', e => {
 let markers = [];
 let popups = [];
 let routeSources = [];
+let routeData = [];
 let sourceCounter = 0;
 
 function restoreLayers() {
-  // After style change, re-add route layers and 3D buildings
   add3DBuildings();
+  routeData.forEach(({id, geojson, color, weight}) => addRouteLayer(id, geojson, color, weight));
 }
 
 function add3DBuildings() {
@@ -82,6 +83,7 @@ export function clearMap() {
     });
   }
   routeSources = [];
+  routeData = [];
 }
 
 export function addMarker(lat, lng, icon) {
@@ -114,6 +116,7 @@ export function addPolyline(coords, color, weight = 5) {
     }
   };
 
+  routeData.push({id, geojson, color, weight});
   if (!map.isStyleLoaded()) {
     map.once('style.load', () => addRouteLayer(id, geojson, color, weight));
   } else {

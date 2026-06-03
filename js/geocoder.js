@@ -76,6 +76,12 @@ async function tryNominatim(query) {
   return parseNominatimResult(data);
 }
 
+function validCoords(result) {
+  if (!result) return null;
+  if (Math.abs(result.lat) > 90 || Math.abs(result.lng) > 180) return null;
+  return result;
+}
+
 function parseNominatimResult(data) {
   if (!data.length) return null;
   const item = data[0];
@@ -106,54 +112,48 @@ export async function geocodeAddress(addr) {
   if (!query) return null;
   const cleaned = normalizeAddress(query);
 
-  // Try Photon first (fastest, best fuzzy matching)
   try {
-    const result = await tryPhoton(query);
+    const result = validCoords(await tryPhoton(query));
     if (result) return result;
   } catch {}
 
-  // Try cleaned query with Photon
   if (cleaned !== query) {
     try {
-      const result = await tryPhoton(cleaned);
+      const result = validCoords(await tryPhoton(cleaned));
       if (result) return result;
     } catch {}
   }
 
-  // Try without ZIP (sometimes ZIP mismatch causes failures)
   if (addr.zip) {
     const noZip = [addr.street, addr.city, addr.state].filter(Boolean).join(', ');
     try {
-      const result = await tryPhoton(noZip);
+      const result = validCoords(await tryPhoton(noZip));
       if (result) return result;
     } catch {}
   }
 
-  // US Census Geocoder (excellent for US street addresses)
   try {
-    const result = await tryCensus(query);
+    const result = validCoords(await tryCensus(query));
     if (result) return result;
   } catch {}
 
   if (addr.zip) {
     const noZip = [addr.street, addr.city, addr.state].filter(Boolean).join(', ');
     try {
-      const result = await tryCensus(noZip);
+      const result = validCoords(await tryCensus(noZip));
       if (result) return result;
     } catch {}
   }
 
-  // Nominatim as last resort
   try {
-    const result = await tryNominatim(query);
+    const result = validCoords(await tryNominatim(query));
     if (result) return result;
   } catch {}
 
-  // Final attempt: Nominatim without ZIP and dots
   if (addr.zip || /\./.test(query)) {
     const lastTry = normalizeAddress([addr.street, addr.city, addr.state].filter(Boolean).join(', '));
     try {
-      const result = await tryNominatim(lastTry);
+      const result = validCoords(await tryNominatim(lastTry));
       if (result) return result;
     } catch {}
   }
@@ -175,29 +175,25 @@ export async function geocodeFreeform(text) {
     }
   }
 
-  // Try Photon
   try {
-    const result = await tryPhoton(query);
+    const result = validCoords(await tryPhoton(query));
     if (result) return {...result, label: query};
   } catch {}
 
-  // Try Census
   try {
-    const result = await tryCensus(query);
+    const result = validCoords(await tryCensus(query));
     if (result) return {...result, label: query};
   } catch {}
 
-  // Try Nominatim
   try {
-    const result = await tryNominatim(query);
+    const result = validCoords(await tryNominatim(query));
     if (result) return {...result, label: query};
   } catch {}
 
-  // Try cleaned version
   const cleaned = normalizeAddress(query);
   if (cleaned !== query) {
     try {
-      const result = await tryPhoton(cleaned);
+      const result = validCoords(await tryPhoton(cleaned));
       if (result) return {...result, label: query};
     } catch {}
   }

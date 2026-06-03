@@ -15,10 +15,10 @@ function getProfile() {
   return OSRM_PROFILES[state.travelMode] || OSRM_PROFILES.car;
 }
 
-async function fetchWithRetry(url, retries = 1, delay = 1500) {
+async function fetchWithRetry(url, retries = 1, delay = 1000) {
   for (let i = 0; i <= retries; i++) {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
+    const timeout = setTimeout(() => controller.abort(), 5000);
     try {
       const r = await fetch(url, {signal: controller.signal});
       clearTimeout(timeout);
@@ -135,7 +135,7 @@ export async function getFullDurationMatrix(renderFn) {
     state.durationMatrix = buildHaversineMatrix(state.SPOTS);
     state.matrixFallback = true;
     if (state.SPOTS.length > 10) {
-      showError('Using approximate distances — routing server unavailable', () => {
+      showError('Using approximate distances (server unavailable)', () => {
         state.durationMatrix = null;
         state.matrixFallback = false;
         renderFn();

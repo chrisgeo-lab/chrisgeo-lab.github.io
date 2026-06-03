@@ -1,3 +1,22 @@
+export function trapFocus(modalEl) {
+  const prev = document.activeElement;
+  const sel = 'input,button,textarea,select,[tabindex]:not([tabindex="-1"])';
+  function getEls() { return [...modalEl.querySelectorAll(sel)].filter(e => !e.disabled && e.offsetParent !== null); }
+  function onKey(e) {
+    if (e.key !== 'Tab') return;
+    const els = getEls();
+    if (!els.length) return;
+    const first = els[0], last = els[els.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  }
+  modalEl.addEventListener('keydown', onKey);
+  return function release() {
+    modalEl.removeEventListener('keydown', onKey);
+    if (prev && prev.focus) prev.focus();
+  };
+}
+
 export function esc(s) {
   if (!s) return '';
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#x27;');

@@ -1,11 +1,13 @@
+import { toast } from './utils.js';
+
 export const DEFAULT_SPOTS = [];
 export const STORE_SPOTS = 'routeflow-spots';
 export const COLORS = ['#007AFF','#34C759','#FF9500','#AF52DE','#FF2D55','#5AC8FA','#5856D6','#FF6482'];
 export const STOP_MIN = 3;
 export const OSRM_PROFILES = {
   car: {primary: 'https://router.project-osrm.org', fallback: 'https://routing.openstreetmap.de/routed-car', service: 'driving'},
-  bike: {primary: 'https://routing.openstreetmap.de/routed-bike', fallback: null, service: 'driving'},
-  walk: {primary: 'https://routing.openstreetmap.de/routed-foot', fallback: null, service: 'driving'}
+  bike: {primary: 'https://routing.openstreetmap.de/routed-bike', fallback: null, service: 'bike'},
+  walk: {primary: 'https://routing.openstreetmap.de/routed-foot', fallback: null, service: 'foot'}
 };
 export const STORE_V = 'routeflow-visited';
 export const STORE_H = 'routeflow-home';
@@ -39,13 +41,14 @@ export function loadJSON(k) {
   try { const r = localStorage.getItem(k); return r ? JSON.parse(r) : null; }
   catch { return null; }
 }
-export function saveSet(k, s) { localStorage.setItem(k, JSON.stringify([...s])); }
+export function saveSet(k, s) { saveJSON(k, [...s]); }
 export function saveJSON(k, v) {
   try { localStorage.setItem(k, JSON.stringify(v)); }
   catch(e) {
     if (e.name === 'QuotaExceededError' || e.code === 22) {
       evictCache();
-      try { localStorage.setItem(k, JSON.stringify(v)); } catch {}
+      try { localStorage.setItem(k, JSON.stringify(v)); }
+      catch { toast('Storage full — data may not persist'); }
     }
   }
 }
@@ -55,7 +58,7 @@ function evictCache() {
   if (keys.length <= 5) return;
   const toRemove = keys.slice(0, Math.ceil(keys.length / 2));
   toRemove.forEach(k => delete state.osrmCache[k]);
-  saveJSON(STORE_CACHE, state.osrmCache);
+  try { localStorage.setItem(STORE_CACHE, JSON.stringify(state.osrmCache)); } catch {}
 }
 
 export function getStartLocation() {
@@ -68,8 +71,18 @@ export function getActiveRoutes() {
   return state.activeFilter >= 0 ? [state.currentRoutes[state.activeFilter]] : state.currentRoutes;
 }
 
+function loadSpots() {
+  try {
+    const r = localStorage.getItem(STORE_SPOTS);
+    if (!r) return DEFAULT_SPOTS;
+    const parsed = JSON.parse(r);
+    if (!Array.isArray(parsed)) return DEFAULT_SPOTS;
+    return parsed.filter(s => s && typeof s.lat === 'number' && typeof s.lng === 'number' && Math.abs(s.lat) <= 90 && Math.abs(s.lng) <= 180);
+  } catch { return DEFAULT_SPOTS; }
+}
+
 export const state = {
-  SPOTS: (function() { try { const r = localStorage.getItem(STORE_SPOTS); return r ? JSON.parse(r) : null; } catch { return null; } })() || DEFAULT_SPOTS,
+  SPOTS: loadSpots(),
   visitedSet: loadSet(STORE_V),
   home: loadJSON(STORE_H),
   startPoint: loadJSON('routeflow-start'),

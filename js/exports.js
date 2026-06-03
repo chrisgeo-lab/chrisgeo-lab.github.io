@@ -3,12 +3,12 @@ import { fmtMi, fmtTime, fmtDur, toast } from './utils.js';
 import { formatForMaps } from './geocoder.js';
 
 export function exportRoute() {
-  if (!state.currentRoutes.length) { toast('No routes to export'); return; }
+  if (!state.currentRoutes.length) { toast('No route yet'); return; }
   const routes = getActiveRoutes();
-  let text = 'ROUTEFLOW - ROUTE PLAN\n';
-  text += `Generated: ${new Date().toLocaleDateString()}\n`;
-  text += `${'='.repeat(40)}\n\n`;
-  if (state.home) text += `END POINT: ${state.home.label}\n\n`;
+  let text = 'RouteFlow Export\n';
+  text += `${new Date().toLocaleDateString()}\n`;
+  text += `${'─'.repeat(30)}\n\n`;
+  if (state.home) text += `End: ${state.home.label}\n\n`;
   routes.forEach(rd => {
     text += `--- ${rd.name} (${rd.totalMiles.toFixed(1)} mi, ~${fmtTime(rd.totalMinutes + rd.route.length * STOP_MIN)}) ---\n`;
     const spots = rd.route.map(i => typeof i === 'number' ? state.SPOTS[i] : i);
@@ -23,7 +23,7 @@ export function exportRoute() {
     });
     text += '\n';
   });
-  text += `\nProgress: ${state.visitedSet.size}/${state.SPOTS.length} stops completed\n`;
+  text += `\n${state.visitedSet.size}/${state.SPOTS.length} done\n`;
 
   const blob = new Blob([text], {type: 'text/plain'});
   const url = URL.createObjectURL(blob);
@@ -35,9 +35,9 @@ export function exportRoute() {
 }
 
 export function exportToGoogleMaps() {
-  if (!state.currentRoutes.length) { toast('No routes to export'); return; }
+  if (!state.currentRoutes.length) { toast('No route yet'); return; }
   if (state.activeFilter < 0 && state.currentRoutes.length > 1) {
-    toast('Select a single route to open in Google Maps');
+    toast('Pick one route first');
     return;
   }
 
@@ -47,7 +47,7 @@ export function exportToGoogleMaps() {
     const sp = typeof idx === 'number' ? state.SPOTS[idx] : idx;
     if (!state.visitedSet.has(sp.id)) stops.push(sp);
   }
-  if (!stops.length) { toast('All stops visited!'); return; }
+  if (!stops.length) { toast('All stops done'); return; }
 
   const allPoints = [];
   const origin = getStartLocation();
@@ -86,20 +86,20 @@ export function exportToGoogleMaps() {
     }
     const included = trimmed.length - (origin ? 1 : 0) - (state.home ? 1 : 0);
     if (included < stops.length) {
-      toast(`Opening ${included} of ${stops.length} stops in Google Maps`);
+      toast(`Google Maps (${included} of ${stops.length} stops)`);
     } else {
-      toast('Opening in Google Maps...');
+      toast('Opening Google Maps');
     }
   } else {
-    toast('Opening in Google Maps...');
+    toast('Opening Google Maps');
   }
-  window.open(url, '_blank');
+  window.open(url, '_blank', 'noopener');
 }
 
 export function exportToAppleMaps() {
-  if (!state.currentRoutes.length) { toast('No routes to export'); return; }
+  if (!state.currentRoutes.length) { toast('No route yet'); return; }
   if (state.activeFilter < 0 && state.currentRoutes.length > 1) {
-    toast('Select a single route to open in Apple Maps');
+    toast('Pick one route first');
     return;
   }
 
@@ -109,7 +109,7 @@ export function exportToAppleMaps() {
     const sp = typeof idx === 'number' ? state.SPOTS[idx] : idx;
     if (!state.visitedSet.has(sp.id)) stops.push(sp);
   }
-  if (!stops.length) { toast('All stops visited!'); return; }
+  if (!stops.length) { toast('All stops done'); return; }
 
   const origin = getStartLocation();
   const appleModes = {car: 'd', bike: 'b', walk: 'w'};
@@ -119,6 +119,6 @@ export function exportToAppleMaps() {
   if (state.home) waypoints.push(`${state.home.lat},${state.home.lng}`);
 
   const url = `https://maps.apple.com/?dirflg=${mode}&saddr=${saddr}&daddr=${waypoints.join('+to:')}`;
-  toast(waypoints.length > 1 ? `Opening ${waypoints.length} stops in Apple Maps...` : 'Opening in Apple Maps...');
-  window.open(url, '_blank');
+  toast('Opening Apple Maps');
+  window.open(url, '_blank', 'noopener');
 }

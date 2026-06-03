@@ -1,10 +1,12 @@
 import { state, STORE_SPOTS, STORE_V, STORE_CACHE, saveSet, saveJSON } from './state.js';
-import { esc, toast } from './utils.js';
+import { esc, toast, trapFocus } from './utils.js';
 import { render, computeMaxClusters } from './ui.js';
 import { geocodeAddress } from './geocoder.js';
+import { normalizeState, parseAddressLine } from './address-parse.js';
 
 let stagedAddresses = [];
 let importMode = 'append';
+let releaseAddrTrap = null;
 
 function resetRouteState() {
   state.durationMatrix = null;
@@ -21,7 +23,9 @@ function updateClusterSlider() {
 }
 
 export function showAddrModal() {
-  document.getElementById('addrModal').classList.add('show');
+  const modal = document.getElementById('addrModal');
+  modal.classList.add('show');
+  releaseAddrTrap = trapFocus(modal);
   stagedAddresses = [];
   renderAddrPreview();
   const hasExisting = state.SPOTS.length > 0;
@@ -50,6 +54,7 @@ export function setImportMode(mode) {
 
 export function hideAddrModal() {
   document.getElementById('addrModal').classList.remove('show');
+  if (releaseAddrTrap) { releaseAddrTrap(); releaseAddrTrap = null; }
   stagedAddresses = [];
   renderAddrPreview();
 }
@@ -78,7 +83,7 @@ function processExcel(file) {
       parseRows(rows[0], rows.slice(1));
     } catch (err) {
       console.error('Excel parse error:', err);
-      toast('Could not parse Excel file — try saving as CSV');
+      toast('Couldn\'t parse Excel file — try CSV instead');
     }
   };
   reader.readAsArrayBuffer(file);
@@ -185,7 +190,7 @@ function parseRows(headers, dataRows) {
     } else if (headers.length >= 2) {
       importAddresses(dataRows.map(r => ({street: r[0] || '', city: r[1] || '', state: '', zip: '', lat: null, lng: null})));
     } else {
-      toast('Could not detect "street" or "address" column');
+      toast('No "street" or "address" column found');
     }
     return;
   }
@@ -205,12 +210,21 @@ function parseRows(headers, dataRows) {
   }).filter(r => r.street);
 
   if (stateCol === -1 && !results.some(r => r.state)) {
-    toast('Warning: No state column detected — addresses may not resolve correctly');
+    toast('No state column found — some addresses may not resolve');
   }
   importAddresses(results);
 }
 
 function importAddresses(addresses) {
+  const MAX_STOPS = 100;
+  const existing = importMode === 'append' ? state.SPOTS.length : 0;
+  const available = MAX_STOPS - existing;
+  if (addresses.length > available) {
+    if (existing > 0) toast(`Max 100 stops — only adding ${available}`);
+    else toast('Max 100 stops');
+    addresses = addresses.slice(0, Math.max(0, available));
+  }
+  if (!addresses.length) return;
   stagedAddresses = addresses.map((a, i) => ({
     id: i + 1,
     street: a.street,
@@ -359,7 +373,7 @@ function applyValidStops(valid) {
 }
 
 export function resetToDefaultStops() {
-  if (!confirm('Clear all stops? This will remove your stops and reset progress.')) return;
+  if (!confirm('Clear all stops and reset progress?')) return;
   state.SPOTS = [];
   localStorage.removeItem(STORE_SPOTS);
   state.visitedSet.clear(); saveSet(STORE_V, state.visitedSet);
@@ -381,8 +395,9 @@ function showFixAddrPrompt(addr) {
     const list = document.getElementById('fixAddrAcList');
     const addrText = [addr.street, addr.city, addr.state].filter(Boolean).join(', ');
     input.value = addrText;
-    document.getElementById('fixAddrTitle').textContent = 'Address not found';
-    document.getElementById('fixAddrDesc').textContent = `Could not locate: "${addrText}"`;
+    document.getElementById('fixAddrTitle').textContent = 'Not found';
+    document.getElementById('fixAddrDesc').textContent = `Couldn't locate "${addrText}"`;
+
     modal.classList.add('show');
     list.classList.remove('show');
     setTimeout(() => { input.focus(); input.select(); }, 100);
@@ -537,85 +552,21 @@ export function setupAutocomplete(inputEl, listEl, onSelect) {
   }
 }
 
-const US_STATES = new Set(['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY','DC']);
-const US_STATE_NAMES = {'alabama':'AL','alaska':'AK','arizona':'AZ','arkansas':'AR','california':'CA','colorado':'CO','connecticut':'CT','delaware':'DE','florida':'FL','georgia':'GA','hawaii':'HI','idaho':'ID','illinois':'IL','indiana':'IN','iowa':'IA','kansas':'KS','kentucky':'KY','louisiana':'LA','maine':'ME','maryland':'MD','massachusetts':'MA','michigan':'MI','minnesota':'MN','mississippi':'MS','missouri':'MO','montana':'MT','nebraska':'NE','nevada':'NV','newhampshire':'NH','newjersey':'NJ','newmexico':'NM','newyork':'NY','northcarolina':'NC','northdakota':'ND','ohio':'OH','oklahoma':'OK','oregon':'OR','pennsylvania':'PA','rhodeisland':'RI','southcarolina':'SC','southdakota':'SD','tennessee':'TN','texas':'TX','utah':'UT','vermont':'VT','virginia':'VA','washington':'WA','westvirginia':'WV','wisconsin':'WI','wyoming':'WY','districtofcolumbia':'DC'};
-
-function normalizeState(s) {
-  if (!s) return '';
-  const upper = s.trim().toUpperCase();
-  if (US_STATES.has(upper)) return upper;
-  const key = s.trim().toLowerCase().replace(/\s+/g, '');
-  return US_STATE_NAMES[key] || s.trim();
-}
-
-function parseAddressLine(line) {
-  let parts;
-  if (line.includes('\t')) parts = line.split('\t');
-  else if (line.includes('|')) parts = line.split('|');
-  else if (line.includes(',')) parts = line.split(',');
-  else if (/\s{3,}/.test(line)) parts = line.split(/\s{3,}/);
-  else parts = null;
-
-  if (parts) {
-    parts = parts.map(p => p.trim()).filter(Boolean);
-    let street = '', city = '', st = '', zip = '';
-    if (parts.length >= 4) {
-      street = parts[0]; city = parts[1]; st = normalizeState(parts[2]); zip = parts[3].replace(/[^\d-]/g, '');
-    } else if (parts.length === 3) {
-      street = parts[0]; city = parts[1];
-      if (/^\d{5}(-\d{4})?$/.test(parts[2].trim())) zip = parts[2].trim();
-      else st = normalizeState(parts[2]);
-    } else if (parts.length === 2) {
-      street = parts[0]; city = parts[1];
-    } else {
-      street = parts[0];
-    }
-    return {street, city, state: st, zip, lat: null, lng: null};
-  }
-
-  // No delimiter detected — try to parse "123 Main St Springfield IL 62701" format
-  const zipMatch = line.match(/\s(\d{5}(?:-\d{4})?)\s*$/);
-  let zip = '';
-  let remaining = line;
-  if (zipMatch) {
-    zip = zipMatch[1];
-    remaining = line.slice(0, zipMatch.index).trim();
-  }
-
-  // Try to find state abbreviation or name at end
-  const words = remaining.split(/\s+/);
-  let st = '';
-  if (words.length >= 3) {
-    const last = words[words.length - 1];
-    if (US_STATES.has(last.toUpperCase())) {
-      st = last.toUpperCase();
-      words.pop();
-    } else {
-      const twoWord = words.slice(-2).join('').toLowerCase();
-      if (US_STATE_NAMES[twoWord]) {
-        st = US_STATE_NAMES[twoWord];
-        words.pop(); words.pop();
-      }
-    }
-  }
-
-  // Treat entire remaining as street (geocoder will resolve city)
-  return {street: words.join(' '), city: '', state: st, zip, lat: null, lng: null};
-}
+export { normalizeState, parseAddressLine };
 
 // Paste section handler
 export function parsePastedText() {
   const text = document.getElementById('addrPasteArea').value.trim();
-  if (!text) { toast('Paste some addresses first'); return; }
+  if (!text) { toast('Nothing to parse'); return; }
   const lines = text.split(/\r?\n/).filter(l => l.trim());
   const addresses = lines.map(line => parseAddressLine(line.trim()));
   const missingState = addresses.filter(a => !a.state);
   if (missingState.length === addresses.length) {
-    toast('State is required — include state in each line');
+    toast('Include a state in each address');
     return;
   }
   if (missingState.length) {
-    toast(`${missingState.length} address${missingState.length > 1 ? 'es' : ''} missing state — they may not resolve correctly`);
+    toast(`${missingState.length} address${missingState.length > 1 ? 'es' : ''} missing state`);
   }
   importAddresses(addresses);
 }
@@ -631,7 +582,7 @@ export function addManualAddress() {
   const st = stateEl.value.trim();
   const zip = zipEl.value.trim();
   if (!street) { streetEl.focus(); return; }
-  if (!st) { toast('State is required'); stateEl.focus(); return; }
+  if (!st) { toast('State required'); stateEl.focus(); return; }
   stagedAddresses.push({
     id: stagedAddresses.length + 1,
     street, city, state: st, zip, lat: null, lng: null, status: 'pending'

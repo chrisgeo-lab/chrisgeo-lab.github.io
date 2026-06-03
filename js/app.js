@@ -1,6 +1,6 @@
 import { state, STORE_V, saveSet, saveJSON } from './state.js';
 import { toast, showError, hideError } from './utils.js';
-import { setView, zoomIn, zoomOut, closePopup } from './map.js';
+import { setView, zoomIn, zoomOut } from './map.js';
 import { render, renderView, renderStopList, toggleVisited, computeMaxClusters,
   setSheetState, toggleRouteDropdown, closeRouteDropdown } from './ui.js';
 import { exportRoute, exportToGoogleMaps, exportToAppleMaps } from './exports.js';
@@ -26,12 +26,6 @@ function switchMobileView(view) {
   }
 }
 
-window._popupToggleVisit = function(id) {
-  const numId = parseInt(id, 10);
-  if (!Number.isFinite(numId)) return;
-  toggleVisited(numId);
-  closePopup();
-};
 
 // Route dropdown
 document.getElementById('routeDropdownTrigger').onclick = toggleRouteDropdown;
@@ -51,7 +45,7 @@ slider.setAttribute('max', MAX_CLUSTERS);
 
 // Buttons
 document.getElementById('resetBtn').onclick = () => {
-  if (!state.visitedSet.size || confirm('Reset all progress?')) { state.visitedSet.clear(); saveSet(STORE_V, state.visitedSet); renderView(); toast('Progress reset'); }
+  if (!state.visitedSet.size || confirm('Reset all progress?')) { state.visitedSet.clear(); saveSet(STORE_V, state.visitedSet); state.durationMatrix = null; render(); toast('Reset'); }
 };
 document.getElementById('setHomeBtn').onclick = showHomeModal;
 document.getElementById('setStartBtn').onclick = showStartModal;
@@ -88,7 +82,7 @@ document.getElementById('gpsLocBtn').onclick = () => {
     setView([state.gpsPos.lat, state.gpsPos.lng], 15);
     state.suppressFitBounds = true;
     renderView();
-  }, () => toast('Location unavailable — check permissions'), {enableHighAccuracy: true, timeout: 10000});
+  }, () => toast('Location unavailable'), {enableHighAccuracy: true, timeout: 10000});
 };
 document.getElementById('toggleVisitedBtn').onclick = () => {
   state.showVisitedMarkers = !state.showVisitedMarkers;
@@ -131,7 +125,7 @@ document.getElementById('homeCancelBtn').onclick = hideHomeModal;
 document.getElementById('homeClearBtn').onclick = () => {
   state.home = null; localStorage.removeItem('routeflow-home');
   hideHomeModal(); render();
-  toast('End point removed — route won\'t loop');
+  toast('End point removed');
 };
 document.getElementById('homeConfirmBtn').onclick = confirmHome;
 document.getElementById('homeInput').onkeydown = (e) => { if (e.key === 'Enter') confirmHome(); };
@@ -142,7 +136,7 @@ document.getElementById('startClearBtn').onclick = () => {
   state.startPoint = null; localStorage.removeItem('routeflow-start');
   hideStartModal(); state.durationMatrix = null;
   render();
-  toast('Using GPS as start point');
+  toast('Start point cleared');
 };
 document.getElementById('startConfirmBtn').onclick = confirmStart;
 document.getElementById('startInput').onkeydown = (e) => { if (e.key === 'Enter') confirmStart(); };
@@ -272,8 +266,8 @@ document.querySelectorAll('.travel-mode-btn').forEach(btn => {
     state.osrmCache = {};
     state.currentRoutes = [];
     render();
-    const labels = {car: 'Driving', bike: 'Cycling', walk: 'Walking'};
-    toast(`Switched to ${labels[mode]} mode`);
+    const labels = {car: 'Driving', bike: 'Biking', walk: 'Walking'};
+    toast(labels[mode]);
   };
 });
 function updateTravelModeUI() {
@@ -291,7 +285,7 @@ if ('serviceWorker' in navigator) {
       const newWorker = reg.installing;
       newWorker.addEventListener('statechange', () => {
         if (newWorker.state === 'activated' && navigator.serviceWorker.controller) {
-          toast('Update available — refresh for latest version');
+          toast('Update available — refresh to get it');
         }
       });
     });
@@ -306,7 +300,7 @@ window.addEventListener('unhandledrejection', e => {
 // Offline detection
 function updateOnlineStatus() {
   if (!navigator.onLine) {
-    showError('You are offline — cached routes still available, but new routing will fail when reconnected');
+    showError('You\'re offline — cached routes still work');
   } else {
     hideError();
   }
@@ -340,7 +334,14 @@ render();
 if (shouldShowTour()) {
   setTimeout(() => {
     const msg = document.getElementById('toast');
-    msg.innerHTML = 'First time here? <button class="toast-undo" onclick="window.resetTour();this.parentElement.classList.remove(\'show\')">Take a Tour</button>';
+    msg.textContent = '';
+    const txt = document.createTextNode('New here? ');
+    const btn = document.createElement('button');
+    btn.className = 'toast-undo';
+    btn.textContent = 'Take a Tour';
+    btn.onclick = () => { window.resetTour(); msg.classList.remove('show'); };
+    msg.appendChild(txt);
+    msg.appendChild(btn);
     msg.classList.add('show');
     setTimeout(() => msg.classList.remove('show'), 8000);
     try { localStorage.setItem('routeflow-tour-complete', '1'); } catch {}

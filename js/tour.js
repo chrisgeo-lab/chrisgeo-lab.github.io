@@ -18,58 +18,51 @@ const steps = [
   {
     id: 'welcome',
     title: 'Welcome to RouteFlow',
-    body: 'Plan optimized multi-stop routes with smart clustering, multiple travel modes, and 3D map views. We\'ve loaded sample Bay Area stops so you can explore.',
+    body: 'Build multi-stop routes. Split them into groups, pick your travel mode, and go.',
     target: null,
-    position: 'center',
-    icon: '\u{1F5FA}️'
+    position: 'center'
   },
   {
     id: 'import',
     title: 'Import Your Stops',
-    body: 'Add addresses by importing CSV/Excel files, pasting a list, or typing one at a time. Multi-provider geocoding handles fuzzy or incomplete addresses.',
+    body: 'Add addresses from a file, paste them, or type them in. Partial addresses work too.',
     target: () => document.getElementById('manageStopsBtn') || document.getElementById('emptyImportBtn'),
-    position: 'left',
-    icon: '\u{1F4CD}'
+    position: 'left'
   },
   {
     id: 'travelmode',
-    title: 'Choose How You Travel',
-    body: 'Switch between driving, cycling, and walking. Routes are re-optimized for each mode with accurate travel times from OpenStreetMap.',
+    title: 'Travel Mode',
+    body: 'Pick driving, biking, or walking. Times and distances update automatically.',
     target: () => document.getElementById('travelModeBar'),
-    position: () => window.innerWidth < 768 ? 'top' : 'left',
-    icon: '\u{1F697}'
+    position: () => window.innerWidth < 768 ? 'top' : 'left'
   },
   {
     id: 'cluster',
     title: 'Split Into Routes',
-    body: 'Too many stops for one trip? Drag the slider to split into multiple optimized routes using geographic clustering.',
+    body: 'Drag the slider to split stops into separate routes by area.',
     target: () => document.querySelector('.cluster-card'),
-    position: 'bottom',
-    icon: '\u{1F504}'
+    position: 'bottom'
   },
   {
     id: 'panel',
     title: 'Your Stop List',
-    body: 'Stops are listed in optimized order. Tap any stop to see it on the map, or check it off as you complete it to track progress.',
+    body: 'Listed in route order. Tap to see on map, check off when done.',
     target: () => window.innerWidth < 768 ? document.getElementById('mobileNavPlan') : document.getElementById('bottomSheet'),
-    position: () => window.innerWidth < 768 ? 'top' : 'left',
-    icon: '\u{1F4CB}'
+    position: () => window.innerWidth < 768 ? 'top' : 'left'
   },
   {
-    id: 'export',
-    title: 'Navigate with Google or Apple Maps',
-    body: 'Export your optimized route directly to Google Maps or Apple Maps for turn-by-turn navigation, or download as a shareable text file.',
-    target: () => document.getElementById('exportBtn'),
-    position: 'left',
-    icon: '\u{1F4E4}'
+    id: 'navigate',
+    title: 'Navigate',
+    body: 'Send your route to Google Maps or Apple Maps for directions.',
+    target: () => document.getElementById('gmapsExportCard') || document.getElementById('gmapsFullRouteBtn'),
+    position: () => window.innerWidth < 768 ? 'top' : 'left'
   },
   {
-    id: 'shortcuts',
-    title: 'You\'re All Set!',
-    body: 'Keyboard shortcuts: H for end point, +/− to zoom, 1–9 to switch routes, Esc to close. The app works fully offline once loaded. Enjoy!',
+    id: 'done',
+    title: 'You\'re Set',
+    body: 'Shortcuts: H = end point, +/− = zoom, 1–9 = switch routes, ? = replay tour.',
     target: null,
-    position: 'center',
-    icon: '⚡'
+    position: 'center'
   }
 ];
 
@@ -79,6 +72,9 @@ let tooltip = null;
 let isActive = false;
 let savedSpots = null;
 let savedVisited = null;
+let resizeHandler = null;
+let keyHandler = null;
+let renderCallback = null;
 
 function loadDemoData(renderFn) {
   savedSpots = state.SPOTS.length ? [...state.SPOTS] : null;
@@ -90,8 +86,9 @@ function loadDemoData(renderFn) {
   state.numClusters = 1;
   state.activeFilter = -1;
   renderFn();
-  const bounds = DEMO_SPOTS.map(s => [s.lat, s.lng]);
-  fitBounds(bounds, {padding: [80, 80]});
+  setTimeout(() => {
+    fitBounds(DEMO_SPOTS.map(s => [s.lat, s.lng]), {padding: [80, 80]});
+  }, 100);
 }
 
 function restoreData(renderFn) {
@@ -112,7 +109,13 @@ function restoreData(renderFn) {
 function createOverlay() {
   overlay = document.createElement('div');
   overlay.className = 'tour-overlay';
-  overlay.innerHTML = '<svg class="tour-overlay-svg" width="100%" height="100%"><defs><mask id="tour-mask"><rect x="0" y="0" width="100%" height="100%" fill="white"/><rect class="tour-cutout" rx="12" ry="12" fill="black"/></mask></defs><rect x="0" y="0" width="100%" height="100%" fill="rgba(0,0,0,0.6)" mask="url(#tour-mask)"/></svg>';
+  overlay.innerHTML = `<svg class="tour-overlay-svg" width="100%" height="100%">
+    <defs><mask id="tour-mask">
+      <rect x="0" y="0" width="100%" height="100%" fill="white"/>
+      <rect class="tour-cutout" rx="12" ry="12" fill="black"/>
+    </mask></defs>
+    <rect x="0" y="0" width="100%" height="100%" fill="rgba(0,0,0,0.55)" mask="url(#tour-mask)"/>
+  </svg>`;
   document.body.appendChild(overlay);
 
   tooltip = document.createElement('div');
@@ -128,6 +131,7 @@ function destroy() {
   if (overlay) { overlay.remove(); overlay = null; }
   if (tooltip) { tooltip.remove(); tooltip = null; }
   if (resizeHandler) { window.removeEventListener('resize', resizeHandler); resizeHandler = null; }
+  if (keyHandler) { document.removeEventListener('keydown', keyHandler); keyHandler = null; }
   isActive = false;
   document.body.classList.remove('tour-active');
 }
@@ -154,6 +158,68 @@ function complete() {
   try { localStorage.setItem(TOUR_KEY, '1'); } catch {}
 }
 
+function positionTooltip(target, position) {
+  const tw = Math.min(320, window.innerWidth - 32);
+  const margin = 16;
+  tooltip.style.width = tw + 'px';
+
+  if (!target || !target.offsetParent) {
+    tooltip.classList.add('tour-center');
+    tooltip.style.top = '';
+    tooltip.style.left = '';
+    tooltip.style.bottom = '';
+    tooltip.style.right = '';
+    return;
+  }
+
+  tooltip.classList.remove('tour-center');
+  const rect = target.getBoundingClientRect();
+  const th = tooltip.offsetHeight || 200;
+
+  let top = '', left = '', bottom = '';
+
+  switch (position) {
+    case 'left': {
+      top = Math.max(margin, Math.min(rect.top, window.innerHeight - th - margin));
+      left = rect.left - tw - margin;
+      if (left < margin) {
+        left = margin;
+        top = rect.bottom + margin;
+      }
+      break;
+    }
+    case 'right': {
+      top = Math.max(margin, Math.min(rect.top, window.innerHeight - th - margin));
+      left = rect.right + margin;
+      if (left + tw > window.innerWidth - margin) {
+        left = margin;
+        top = rect.bottom + margin;
+      }
+      break;
+    }
+    case 'top': {
+      left = Math.max(margin, Math.min(rect.left, window.innerWidth - tw - margin));
+      const bottomVal = window.innerHeight - rect.top + margin;
+      tooltip.style.top = '';
+      tooltip.style.left = left + 'px';
+      tooltip.style.bottom = bottomVal + 'px';
+      tooltip.style.right = '';
+      return;
+    }
+    case 'bottom':
+    default: {
+      top = rect.bottom + margin;
+      left = Math.max(margin, Math.min(rect.left, window.innerWidth - tw - margin));
+      break;
+    }
+  }
+
+  tooltip.style.top = top + 'px';
+  tooltip.style.left = left + 'px';
+  tooltip.style.bottom = '';
+  tooltip.style.right = '';
+}
+
 function showStep() {
   const step = steps[currentStep];
   const target = step.target ? step.target() : null;
@@ -172,81 +238,32 @@ function showStep() {
     cutout.style.display = 'none';
   }
 
-  const dots = steps.map((_, i) =>
-    `<span class="tour-dot${i === currentStep ? ' active' : ''}"></span>`
-  ).join('');
-
   const isFirst = currentStep === 0;
   const isLast = currentStep === steps.length - 1;
+  const progress = ((currentStep + 1) / steps.length) * 100;
 
   tooltip.innerHTML = `
-    <div class="tour-tooltip-icon">${step.icon}</div>
+    <div class="tour-progress"><div class="tour-progress-fill" style="width:${progress}%"></div></div>
     <div class="tour-tooltip-title">${step.title}</div>
     <div class="tour-tooltip-body">${step.body}</div>
     <div class="tour-tooltip-footer">
-      <div class="tour-dots">${dots}</div>
+      <div class="tour-step-count">${currentStep + 1} / ${steps.length}</div>
       <div class="tour-actions">
-        ${isFirst ? `<button class="tour-btn tour-btn-skip" onclick="window._tourSkip()">Skip</button>` : `<button class="tour-btn tour-btn-back" onclick="window._tourBack()">Back</button>`}
-        <button class="tour-btn tour-btn-next" onclick="window._tourNext()">${isLast ? 'Get Started' : 'Next'}</button>
+        ${isFirst ? `<button class="tour-btn tour-btn-skip">Skip</button>` : `<button class="tour-btn tour-btn-back">Back</button>`}
+        <button class="tour-btn tour-btn-next">${isLast ? 'Done' : 'Next'}</button>
       </div>
-    </div>
-    <div class="tour-step-count">${currentStep + 1} of ${steps.length}</div>
-  `;
+    </div>`;
+
+  tooltip.querySelector('.tour-btn-next').onclick = advance;
+  if (isFirst) tooltip.querySelector('.tour-btn-skip').onclick = complete;
+  else tooltip.querySelector('.tour-btn-back').onclick = goBack;
 
   tooltip.className = 'tour-tooltip';
-  tooltip.classList.add('visible');
-
-  if (!target || !target.offsetParent) {
-    tooltip.classList.add('tour-center');
-    tooltip.style.top = '';
-    tooltip.style.left = '';
-    tooltip.style.bottom = '';
-    tooltip.style.right = '';
-    return;
-  }
-
-  tooltip.classList.remove('tour-center');
-  const rect = target.getBoundingClientRect();
-  const tw = 320;
-  const margin = 16;
-
-  tooltip.style.width = tw + 'px';
-
-  switch (position) {
-    case 'left':
-      tooltip.style.top = Math.max(margin, rect.top) + 'px';
-      tooltip.style.left = Math.max(margin, rect.left - tw - margin) + 'px';
-      tooltip.style.right = '';
-      tooltip.style.bottom = '';
-      if (rect.left - tw - margin < margin) {
-        tooltip.style.left = margin + 'px';
-        tooltip.style.top = (rect.bottom + margin) + 'px';
-      }
-      break;
-    case 'right':
-      tooltip.style.top = Math.max(margin, rect.top) + 'px';
-      tooltip.style.left = (rect.right + margin) + 'px';
-      tooltip.style.right = '';
-      tooltip.style.bottom = '';
-      break;
-    case 'top':
-      tooltip.style.left = Math.max(margin, Math.min(rect.left, window.innerWidth - tw - margin)) + 'px';
-      tooltip.style.bottom = (window.innerHeight - rect.top + margin) + 'px';
-      tooltip.style.top = '';
-      tooltip.style.right = '';
-      break;
-    case 'bottom':
-    default:
-      tooltip.style.left = Math.max(margin, Math.min(rect.left, window.innerWidth - tw - margin)) + 'px';
-      tooltip.style.top = (rect.bottom + margin) + 'px';
-      tooltip.style.right = '';
-      tooltip.style.bottom = '';
-      break;
-  }
+  requestAnimationFrame(() => {
+    tooltip.classList.add('visible');
+    positionTooltip(target, position);
+  });
 }
-
-let resizeHandler = null;
-let renderCallback = null;
 
 export function startTour(renderFn) {
   if (isActive) return;
@@ -260,18 +277,21 @@ export function startTour(renderFn) {
 
   showStep();
 
-  window._tourNext = advance;
-  window._tourBack = goBack;
-  window._tourSkip = complete;
+  keyHandler = (e) => {
+    if (!isActive) return;
+    if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); advance(); }
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); goBack(); }
+    else if (e.key === 'Escape') { e.preventDefault(); complete(); }
+  };
+  document.addEventListener('keydown', keyHandler);
 
-  resizeHandler = () => { if (isActive) showStep(); };
+  let resizeTimer = null;
+  resizeHandler = () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { if (isActive) showStep(); }, 150); };
   window.addEventListener('resize', resizeHandler);
 }
 
 export function shouldShowTour() {
-  try {
-    return !localStorage.getItem(TOUR_KEY);
-  } catch { return false; }
+  try { return !localStorage.getItem(TOUR_KEY); } catch { return false; }
 }
 
 export function resetTour() {
