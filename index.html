@@ -27,6 +27,15 @@
 </head>
 <body>
 
+<!-- Loading screen -->
+<div class="app-loading" id="appLoading">
+  <div class="app-loading-icon">
+    <svg viewBox="0 0 32 32" fill="none"><circle cx="16" cy="14" r="6" fill="white"/><path d="M16 20 L10 28 L22 28 Z" fill="white"/></svg>
+  </div>
+  <div class="app-loading-text">Loading RouteFlow...</div>
+  <div class="app-loading-bar"><div class="app-loading-bar-fill"></div></div>
+</div>
+
 <div id="map" role="application" aria-label="Route map"></div>
 <div class="progress-bar"><div class="progress-bar-fill" id="progressBar" style="width:0%"></div></div>
 <div class="loading-indicator" id="loading"></div>
@@ -156,64 +165,128 @@
   </button>
 </nav>
 
-<!-- End Point modal -->
-<div class="modal-overlay" id="homeModal" role="dialog" aria-modal="true" aria-labelledby="homeModalTitle">
-  <div class="modal">
-    <h3 id="homeModalTitle">Set End Point</h3>
-    <p>Where should your route end?</p>
-    <div class="point-mode-tabs" id="homeModeTabs">
-      <button class="point-mode-tab active" data-mode="none">None</button>
-      <button class="point-mode-tab" data-mode="stop">Pick a Stop</button>
-      <button class="point-mode-tab" data-mode="address">Custom Address</button>
-    </div>
-    <div class="point-mode-content" id="homeModeContent">
-      <div class="point-mode-section active" data-mode="none">
-        <div class="point-mode-hint">Route ends at the last stop (no loop).</div>
-      </div>
-      <div class="point-mode-section" data-mode="stop">
-        <div class="point-stop-list" id="homeStopList"></div>
-      </div>
-      <div class="point-mode-section" data-mode="address">
-        <div class="addr-autocomplete">
-          <input type="text" class="modal-input" id="homeInput" placeholder="e.g. 123 Main St, Boston, MA" autocomplete="off">
-          <div class="addr-ac-list" id="homeAcList"></div>
-        </div>
-      </div>
-    </div>
-    <div class="modal-actions">
-      <button class="modal-btn modal-btn-cancel" id="homeCancelBtn">Cancel</button>
-      <button class="modal-btn modal-btn-primary" id="homeConfirmBtn">Set End</button>
-    </div>
-  </div>
-</div>
-
 <!-- Start Point modal -->
 <div class="modal-overlay" id="startModal" role="dialog" aria-modal="true" aria-labelledby="startModalTitle">
-  <div class="modal">
-    <h3 id="startModalTitle">Set Start Point</h3>
-    <p>Where does your route begin?</p>
+  <div class="modal point-modal">
+    <div class="point-modal-header">
+      <div class="point-modal-icon point-modal-icon--start">&#9654;</div>
+      <div>
+        <h3 id="startModalTitle">Start Point</h3>
+        <p class="point-modal-desc">Where does your route begin?</p>
+      </div>
+    </div>
+    <div class="point-modal-current" id="startCurrentDisplay" style="display:none">
+      <span class="point-modal-current-label">Current:</span>
+      <span class="point-modal-current-value" id="startCurrentValue"></span>
+    </div>
     <div class="point-mode-tabs" id="startModeTabs">
-      <button class="point-mode-tab active" data-mode="gps">Current Location</button>
-      <button class="point-mode-tab" data-mode="stop">Pick a Stop</button>
-      <button class="point-mode-tab" data-mode="address">Custom Address</button>
+      <button class="point-mode-tab active" data-mode="gps">
+        <span class="point-mode-tab-icon">&#9678;</span>
+        <span class="point-mode-tab-text">GPS Location</span>
+      </button>
+      <button class="point-mode-tab" data-mode="stop">
+        <span class="point-mode-tab-icon">&#9873;</span>
+        <span class="point-mode-tab-text">From Stops</span>
+      </button>
+      <button class="point-mode-tab" data-mode="address">
+        <span class="point-mode-tab-icon">&#9998;</span>
+        <span class="point-mode-tab-text">Address</span>
+      </button>
     </div>
     <div class="point-mode-content" id="startModeContent">
       <div class="point-mode-section active" data-mode="gps">
-        <div class="point-mode-hint">Route starts from your GPS location.</div>
+        <div class="point-mode-hint">
+          <span class="point-mode-hint-icon">&#128205;</span>
+          Route starts from your current GPS location. Make sure location services are enabled.
+        </div>
       </div>
       <div class="point-mode-section" data-mode="stop">
+        <div class="point-stop-search-wrap">
+          <input type="text" class="point-stop-search" id="startStopSearch" placeholder="Filter stops..." autocomplete="off">
+        </div>
         <div class="point-stop-list" id="startStopList"></div>
       </div>
       <div class="point-mode-section" data-mode="address">
         <div class="addr-autocomplete">
-          <input type="text" class="modal-input" id="startInput" placeholder="Enter an address" autocomplete="off">
+          <input type="text" class="modal-input" id="startInput" placeholder="Type an address to search..." autocomplete="off">
           <div class="addr-ac-list" id="startAcList"></div>
         </div>
+        <div class="point-mode-hint point-mode-hint--small">Start typing to see suggestions from OpenStreetMap.</div>
       </div>
     </div>
-    <div class="modal-actions">
+    <div class="point-modal-footer">
       <button class="modal-btn modal-btn-cancel" id="startCancelBtn">Cancel</button>
-      <button class="modal-btn modal-btn-primary" id="startConfirmBtn">Set Start</button>
+      <button class="modal-btn modal-btn-primary" id="startConfirmBtn">
+        <span class="point-modal-btn-icon">&#9654;</span> Set Start
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- End Point modal -->
+<div class="modal-overlay" id="homeModal" role="dialog" aria-modal="true" aria-labelledby="homeModalTitle">
+  <div class="modal point-modal">
+    <div class="point-modal-header">
+      <div class="point-modal-icon point-modal-icon--end">&#9632;</div>
+      <div>
+        <h3 id="homeModalTitle">End Point</h3>
+        <p class="point-modal-desc">Where should your route finish?</p>
+      </div>
+    </div>
+    <div class="point-modal-current" id="homeCurrentDisplay" style="display:none">
+      <span class="point-modal-current-label">Current:</span>
+      <span class="point-modal-current-value" id="homeCurrentValue"></span>
+    </div>
+    <div class="point-mode-tabs" id="homeModeTabs">
+      <button class="point-mode-tab active" data-mode="none">
+        <span class="point-mode-tab-icon">&#10005;</span>
+        <span class="point-mode-tab-text">None</span>
+      </button>
+      <button class="point-mode-tab" data-mode="gps">
+        <span class="point-mode-tab-icon">&#9678;</span>
+        <span class="point-mode-tab-text">GPS Location</span>
+      </button>
+      <button class="point-mode-tab" data-mode="stop">
+        <span class="point-mode-tab-icon">&#9873;</span>
+        <span class="point-mode-tab-text">From Stops</span>
+      </button>
+      <button class="point-mode-tab" data-mode="address">
+        <span class="point-mode-tab-icon">&#9998;</span>
+        <span class="point-mode-tab-text">Address</span>
+      </button>
+    </div>
+    <div class="point-mode-content" id="homeModeContent">
+      <div class="point-mode-section active" data-mode="none">
+        <div class="point-mode-hint">
+          <span class="point-mode-hint-icon">&#8634;</span>
+          Route ends at the last optimized stop. No return trip will be calculated.
+        </div>
+      </div>
+      <div class="point-mode-section" data-mode="gps">
+        <div class="point-mode-hint">
+          <span class="point-mode-hint-icon">&#128205;</span>
+          Route ends at your current GPS location. A return leg will be added.
+        </div>
+      </div>
+      <div class="point-mode-section" data-mode="stop">
+        <div class="point-stop-search-wrap">
+          <input type="text" class="point-stop-search" id="homeStopSearch" placeholder="Filter stops..." autocomplete="off">
+        </div>
+        <div class="point-stop-list" id="homeStopList"></div>
+      </div>
+      <div class="point-mode-section" data-mode="address">
+        <div class="addr-autocomplete">
+          <input type="text" class="modal-input" id="homeInput" placeholder="Type an address to search..." autocomplete="off">
+          <div class="addr-ac-list" id="homeAcList"></div>
+        </div>
+        <div class="point-mode-hint point-mode-hint--small">Start typing to see suggestions from OpenStreetMap.</div>
+      </div>
+    </div>
+    <div class="point-modal-footer">
+      <button class="modal-btn modal-btn-cancel" id="homeCancelBtn">Cancel</button>
+      <button class="modal-btn modal-btn-primary" id="homeConfirmBtn">
+        <span class="point-modal-btn-icon">&#9632;</span> Set End
+      </button>
     </div>
   </div>
 </div>
