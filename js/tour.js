@@ -1,4 +1,5 @@
 import { state } from './state.js';
+import { map } from './map.js';
 
 const TOUR_KEY = 'routeflow-tour-complete';
 
@@ -89,6 +90,8 @@ function loadDemoData(renderFn) {
   state.numClusters = 1;
   state.activeFilter = -1;
   renderFn();
+  const bounds = DEMO_SPOTS.map(s => [s.lat, s.lng]);
+  map.fitBounds(bounds, {padding: [80, 80]});
 }
 
 function restoreData(renderFn) {

@@ -164,7 +164,7 @@ function lightenColor(hex, factor) {
   return `rgb(${r},${g},${b})`;
 }
 
-export function hexToRgb(hex) {
+function hexToRgb(hex) {
   hex = hex.replace('#', '');
   if (hex.length === 3) hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
   return {r: parseInt(hex.slice(0, 2), 16), g: parseInt(hex.slice(2, 4), 16), b: parseInt(hex.slice(4, 6), 16)};
@@ -227,11 +227,3 @@ map.zoomOut = function() { map.zoomTo(map.getZoom() - 1, {duration: 300}); };
 map.closePopup = function() { popups.forEach(p => p.remove()); popups = []; };
 
 export function trackPopup(popup) { popups.push(popup); }
-
-// removeLayer compat: old code passes marker objects, MapLibre expects string IDs
-const _nativeRemoveLayer = map.removeLayer.bind(map);
-map.removeLayer = function(obj) {
-  if (typeof obj === 'string') return _nativeRemoveLayer(obj);
-  if (obj && obj.remove) obj.remove();
-};
-

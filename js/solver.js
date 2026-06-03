@@ -1,16 +1,10 @@
-import { state } from './state.js';
-
-export function clusterByTime(k, matrix) {
-  const n = state.SPOTS.length;
-  if (k <= 1) return [state.SPOTS.map((_, i) => i)];
-  if (k >= n) return state.SPOTS.map((_, i) => [i]);
-
+function kMedoids(n, k, distFn) {
   const medoids = [0];
   while (medoids.length < k) {
     let maxD = -1, maxI = 0;
     for (let i = 0; i < n; i++) {
       if (medoids.includes(i)) continue;
-      const minD = Math.min(...medoids.map(m => (matrix[i][m] + matrix[m][i]) / 2));
+      const minD = Math.min(...medoids.map(m => distFn(i, m)));
       if (minD > maxD) { maxD = minD; maxI = i; }
     }
     medoids.push(maxI);
@@ -22,7 +16,7 @@ export function clusterByTime(k, matrix) {
     for (let i = 0; i < n; i++) {
       let best = 0, bestT = Infinity;
       for (let c = 0; c < k; c++) {
-        const t = (matrix[i][medoids[c]] + matrix[medoids[c]][i]) / 2;
+        const t = distFn(i, medoids[c]);
         if (t < bestT) { bestT = t; best = c; }
       }
       if (assign[i] !== best) { assign[i] = best; changed = true; }
@@ -33,36 +27,13 @@ export function clusterByTime(k, matrix) {
       if (!members.length) continue;
       let bestM = members[0], bestC = Infinity;
       for (const cand of members) {
-        let cost = 0; for (const m of members) cost += matrix[cand][m] + matrix[m][cand];
+        let cost = 0; for (const m of members) cost += distFn(cand, m) + distFn(m, cand);
         if (cost < bestC) { bestC = cost; bestM = cand; }
       }
       medoids[c] = bestM;
     }
   }
-
-  for (let pass = 0; pass < 5; pass++) {
-    let improved = false;
-    for (let i = 0; i < n; i++) {
-      const curC = assign[i];
-      const curMembers = []; for (let j = 0; j < n; j++) if (assign[j] === curC) curMembers.push(j);
-      if (curMembers.length <= 2) continue;
-      let bestGain = 0, bestTarget = -1;
-      for (let c = 0; c < k; c++) {
-        if (c === curC) continue;
-        const targetMembers = []; for (let j = 0; j < n; j++) if (assign[j] === c) targetMembers.push(j);
-        const addCost = targetMembers.reduce((s, m) => s + matrix[i][m] + matrix[m][i], 0) / Math.max(1, targetMembers.length);
-        const removeSaving = curMembers.reduce((s, m) => s + matrix[i][m] + matrix[m][i], 0) / Math.max(1, curMembers.length);
-        const gain = removeSaving - addCost;
-        if (gain > bestGain) { bestGain = gain; bestTarget = c; }
-      }
-      if (bestTarget >= 0) { assign[i] = bestTarget; improved = true; }
-    }
-    if (!improved) break;
-  }
-
-  const clusters = Array.from({ length: k }, () => []);
-  for (let i = 0; i < n; i++) clusters[assign[i]].push(i);
-  return clusters.filter(c => c.length > 0);
+  return assign;
 }
 
 export function clusterUnvisited(indices, k, matrix) {
@@ -70,47 +41,14 @@ export function clusterUnvisited(indices, k, matrix) {
   if (k >= indices.length) return indices.map(i => [i]);
   const n = indices.length;
 
-  const medoids = [0];
-  while (medoids.length < k) {
-    let maxD = -1, maxI = 0;
-    for (let i = 0; i < n; i++) {
-      if (medoids.includes(i)) continue;
-      const minD = Math.min(...medoids.map(m => (matrix[indices[i]][indices[m]] + matrix[indices[m]][indices[i]]) / 2));
-      if (minD > maxD) { maxD = minD; maxI = i; }
-    }
-    medoids.push(maxI);
-  }
-
-  let assign = new Array(n).fill(0);
-  for (let iter = 0; iter < 50; iter++) {
-    let changed = false;
-    for (let i = 0; i < n; i++) {
-      let best = 0, bestT = Infinity;
-      for (let c = 0; c < k; c++) {
-        const t = (matrix[indices[i]][indices[medoids[c]]] + matrix[indices[medoids[c]]][indices[i]]) / 2;
-        if (t < bestT) { bestT = t; best = c; }
-      }
-      if (assign[i] !== best) { assign[i] = best; changed = true; }
-    }
-    if (!changed) break;
-    for (let c = 0; c < k; c++) {
-      const members = []; for (let i = 0; i < n; i++) if (assign[i] === c) members.push(i);
-      if (!members.length) continue;
-      let bestM = members[0], bestC = Infinity;
-      for (const cand of members) {
-        let cost = 0; for (const m of members) cost += matrix[indices[cand]][indices[m]] + matrix[indices[m]][indices[cand]];
-        if (cost < bestC) { bestC = cost; bestM = cand; }
-      }
-      medoids[c] = bestM;
-    }
-  }
+  const assign = kMedoids(n, k, (i, j) => (matrix[indices[i]][indices[j]] + matrix[indices[j]][indices[i]]) / 2);
 
   const clusters = Array.from({ length: k }, () => []);
   for (let i = 0; i < n; i++) clusters[assign[i]].push(indices[i]);
   return clusters.filter(c => c.length > 0);
 }
 
-export function routeCost(route, matrix) {
+function routeCost(route, matrix) {
   let c = 0; for (let i = 0; i < route.length - 1; i++) c += matrix[route[i]][route[i + 1]];
   return c;
 }
@@ -164,7 +102,6 @@ export function tspWithMatrix(indices, matrix, startIdx) {
       for (let i = 1; i < best.length - segLen; i++) {
         const seg = best.slice(i, i + segLen);
         const without = [...best.slice(0, i), ...best.slice(i + segLen)];
-        const removalGain = routeCost(best, matrix) - routeCost(without, matrix) - (segLen > 1 ? routeCost(seg, matrix) : 0);
         for (let j = 1; j < without.length; j++) {
           if (j === i) continue;
           const candidate = [...without.slice(0, j), ...seg, ...without.slice(j)];

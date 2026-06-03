@@ -1,9 +1,9 @@
 import { state, OSRM_PROFILES, STORE_CACHE, CACHE_MAX_ENTRIES, saveJSON } from './state.js';
 import { hd, showError } from './utils.js';
 
-export function cacheKey(pts) { return `${state.travelMode}:${pts.map(p => `${p.lat.toFixed(5)},${p.lng.toFixed(5)}`).join('|')}`; }
+function cacheKey(pts) { return `${state.travelMode}:${pts.map(p => `${p.lat.toFixed(5)},${p.lng.toFixed(5)}`).join('|')}`; }
 
-export function trimCache() {
+function trimCache() {
   const keys = Object.keys(state.osrmCache);
   if (keys.length > CACHE_MAX_ENTRIES) {
     const toRemove = keys.slice(0, keys.length - CACHE_MAX_ENTRIES);
@@ -11,16 +11,8 @@ export function trimCache() {
   }
 }
 
-function getServers() {
-  const profile = OSRM_PROFILES[state.travelMode] || OSRM_PROFILES.car;
-  const servers = [profile.primary];
-  if (profile.fallback) servers.push(profile.fallback);
-  return servers;
-}
-
-function getServiceName() {
-  const profile = OSRM_PROFILES[state.travelMode] || OSRM_PROFILES.car;
-  return profile.service;
+function getProfile() {
+  return OSRM_PROFILES[state.travelMode] || OSRM_PROFILES.car;
 }
 
 async function fetchWithRetry(url, retries = 2, delay = 2000, signal) {
@@ -42,11 +34,11 @@ async function fetchWithRetry(url, retries = 2, delay = 2000, signal) {
 }
 
 async function fetchFromAnyServer(path) {
-  const servers = getServers();
+  const profile = getProfile();
+  const servers = [profile.primary, ...(profile.fallback ? [profile.fallback] : [])];
   for (const server of servers) {
     try {
-      const r = await fetchWithRetry(`${server}${path}`);
-      return r;
+      return await fetchWithRetry(`${server}${path}`);
     } catch (e) {
       if (server === servers[servers.length - 1]) throw e;
     }
@@ -55,7 +47,7 @@ async function fetchFromAnyServer(path) {
 
 export async function fetchTable(pts) {
   const c = pts.map(p => `${p.lng},${p.lat}`).join(';');
-  const svc = getServiceName();
+  const svc = getProfile().service;
   const r = await fetchFromAnyServer(`/table/v1/${svc}/${c}?annotations=duration`);
   const d = await r.json();
   if (d.code !== 'Ok') throw new Error(d.message || d.code);
@@ -84,7 +76,7 @@ async function fetchTableChunked(pts) {
       const dstIndices = Array.from({length: dstLen}, (_, i) => i + srcLen);
 
       const c = allPts.map(p => `${p.lng},${p.lat}`).join(';');
-      const svc = getServiceName();
+      const svc = getProfile().service;
       const path = `/table/v1/${svc}/${c}?annotations=duration&sources=${srcIndices.join(';')}&destinations=${dstIndices.join(';')}`;
       const r = await fetchFromAnyServer(path);
       const d = await r.json();
@@ -106,7 +98,7 @@ export async function fetchRoute(pts) {
   const key = cacheKey(pts);
   if (state.osrmCache[key]) return state.osrmCache[key];
   const c = pts.map(p => `${p.lng},${p.lat}`).join(';');
-  const svc = getServiceName();
+  const svc = getProfile().service;
   const r = await fetchFromAnyServer(`/route/v1/${svc}/${c}?overview=full&geometries=geojson&steps=true`);
   const d = await r.json();
   if (d.code !== 'Ok') throw new Error(d.message || d.code);

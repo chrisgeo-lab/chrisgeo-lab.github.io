@@ -1,30 +1,18 @@
-import { state, COLORS, STOP_MIN, STORE_V, STORE_H, STORE_SPOTS, saveSet, saveJSON } from './state.js';
-import { esc, hd, fmtMi, fmtMiShort, fmtTime, fmtDur, toast, setLoading, showError, hideError } from './utils.js';
+import { state, COLORS, STOP_MIN, STORE_V, STORE_SPOTS, saveSet, getStartLocation, getActiveRoutes } from './state.js';
+import { esc, hd, fmtMi, fmtTime, fmtDur, toast, setLoading, showError, hideError } from './utils.js';
 import { fetchTable, fetchRoute, buildHaversineMatrix, getFullDurationMatrix } from './routing.js';
 import { clusterUnvisited, tspWithMatrix } from './solver.js';
 import { map, clearMap, addMarker, addPolyline, stopIcon, homeIcon, gpsIcon, trackPopup } from './map.js';
-import { geocodeFreeform, formatForMaps } from './geocoder.js';
 
-function getStartLocation() {
-  if (state.startPoint) return state.startPoint;
-  if (state.gpsPos) return {lat: state.gpsPos.lat, lng: state.gpsPos.lng, label: 'Current Location'};
-  return null;
-}
+let gpsMarker = null;
 
 async function solveRoute(spotIndices, color, name, matrix) {
   let orderedIndices;
   const origin = getStartLocation();
+  const anchor = origin || state.home;
 
-  if (origin) {
-    const pts = [origin, ...spotIndices.map(i => state.SPOTS[i])];
-    let localMatrix;
-    try { const tbl = await fetchTable(pts); localMatrix = tbl.durations; }
-    catch { localMatrix = buildHaversineMatrix(pts); }
-    const n = pts.length;
-    const order = tspWithMatrix([...Array(n).keys()], localMatrix, 0);
-    orderedIndices = order.filter(i => i !== 0).map(i => spotIndices[i - 1]);
-  } else if (state.home) {
-    const pts = [state.home, ...spotIndices.map(i => state.SPOTS[i])];
+  if (anchor) {
+    const pts = [anchor, ...spotIndices.map(i => state.SPOTS[i])];
     let localMatrix;
     try { const tbl = await fetchTable(pts); localMatrix = tbl.durations; }
     catch { localMatrix = buildHaversineMatrix(pts); }
@@ -78,12 +66,10 @@ export async function render() {
 
     if (ver !== state.renderVer) return;
     state.currentRoutes = results;
-    state.lastRenderError = null;
     if (state.activeFilter >= state.currentRoutes.length) state.activeFilter = -1;
     renderView();
   } catch (e) {
     console.error('Routing failed:', e);
-    state.lastRenderError = e;
     showError('Route calculation failed — using approximate distances', () => { state.durationMatrix = null; render(); });
   } finally {
     if (ver === state.renderVer) setLoading(false);
@@ -106,7 +92,7 @@ function bindPopup(marker, html) {
 
 export function renderView() {
   clearMap();
-  const routes = state.activeFilter >= 0 ? [state.currentRoutes[state.activeFilter]] : state.currentRoutes;
+  const routes = getActiveRoutes();
   const bounds = [];
   const routeSpotIds = new Set();
   const lineWeight = routes.length === 1 ? 5 : 4;
@@ -116,11 +102,12 @@ export function renderView() {
       addPolyline(ll, rd.color, lineWeight);
     }
     const spots = rd.route.map(i => typeof i === 'number' ? state.SPOTS[i] : i);
+    const firstUnvisitedMap = spots.findIndex(s => !state.visitedSet.has((typeof s === 'number' ? state.SPOTS[s] : s).id));
     spots.forEach((s, i) => {
       const spot = typeof s === 'number' ? state.SPOTS[s] : s;
       const sid = spot.id;
       routeSpotIds.add(sid);
-      const curr = i === 0 || spots.slice(0, i).every(p => state.visitedSet.has((typeof p === 'number' ? state.SPOTS[p] : p).id));
+      const curr = i === firstUnvisitedMap || (firstUnvisitedMap === -1 && i === 0);
       const mk = addMarker(spot.lat, spot.lng, stopIcon(i + 1, rd.color, false, curr));
       const legOffset = getStartLocation() ? 1 : 0;
       const legInfo = rd.legs && rd.legs[legOffset + i];
@@ -151,9 +138,9 @@ export function renderView() {
     bindPopup(mk, `<div style="padding:10px;font-family:var(--font)"><div style="font-size:11px;color:#007AFF;font-weight:600">Start Point</div><div style="font-size:14px;font-weight:600;margin-top:2px">${esc(state.startPoint.label)}</div></div>`);
     bounds.push([state.startPoint.lat, state.startPoint.lng]);
   }
-  if (state.persistentGpsMarker) { state.persistentGpsMarker.remove(); state.persistentGpsMarker = null; }
+  if (gpsMarker) { gpsMarker.remove(); gpsMarker = null; }
   if (state.gpsPos) {
-    state.persistentGpsMarker = addMarker(state.gpsPos.lat, state.gpsPos.lng, gpsIcon());
+    gpsMarker = addMarker(state.gpsPos.lat, state.gpsPos.lng, gpsIcon());
   }
   if (bounds.length && !state.suppressFitBounds) {
     const isDesktop = window.innerWidth >= 768;
@@ -222,7 +209,7 @@ export function closeRouteDropdown() {
 }
 
 function renderStats() {
-  const routes = state.activeFilter >= 0 ? [state.currentRoutes[state.activeFilter]] : state.currentRoutes;
+  const routes = getActiveRoutes();
   const totalMi = routes.reduce((s, r) => s + r.totalMiles, 0);
   const totalMin = routes.reduce((s, r) => s + r.totalMinutes, 0);
   const unvisitedStops = routes.reduce((s, r) => s + r.route.length, 0);
@@ -243,7 +230,7 @@ function renderStats() {
 function renderNextStop() {
   const card = document.getElementById('nextStopCard');
   const gmapsCard = document.getElementById('gmapsExportCard');
-  const routes = state.activeFilter >= 0 ? [state.currentRoutes[state.activeFilter]] : state.currentRoutes;
+  const routes = getActiveRoutes();
   let nextSpot = null, nextLeg = null;
   for (const r of routes) {
     for (let i = 0; i < r.route.length; i++) {
@@ -275,7 +262,7 @@ function renderNextStop() {
 
 export function renderStopList() {
   const el = document.getElementById('stopsView'); el.innerHTML = '';
-  const routes = state.activeFilter >= 0 ? [state.currentRoutes[state.activeFilter]] : state.currentRoutes;
+  const routes = getActiveRoutes();
   const query = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
   routes.forEach((rd, ri) => {
     if (routes.length > 1) {
@@ -293,10 +280,11 @@ export function renderStopList() {
       el.appendChild(hi);
     }
     const spots = rd.route.map(i => typeof i === 'number' ? state.SPOTS[i] : i);
+    const firstUnvisited = spots.findIndex(s => !state.visitedSet.has((typeof s === 'number' ? state.SPOTS[s] : s).id));
     spots.forEach((s, i) => {
       const spot = typeof s === 'number' ? state.SPOTS[s] : s;
       if (query && !spot.street.toLowerCase().includes(query) && !spot.city.toLowerCase().includes(query)) return;
-      const curr = i === 0 || spots.slice(0, i).every(p => state.visitedSet.has((typeof p === 'number' ? state.SPOTS[p] : p).id));
+      const curr = i === firstUnvisited || (firstUnvisited === -1 && i === 0);
       const leg = rd.legs ? rd.legs[(getStartLocation() ? 1 : 0) + i] : null;
       const item = document.createElement('div');
       item.className = 'stop-item' + (curr ? ' current' : '');
@@ -395,142 +383,6 @@ function updateEmptyState() {
   }
 }
 
-export function exportRoute() {
-  if (!state.currentRoutes.length) { toast('No routes to export'); return; }
-  const routes = state.activeFilter >= 0 ? [state.currentRoutes[state.activeFilter]] : state.currentRoutes;
-  let text = 'ROUTEFLOW - ROUTE PLAN\n';
-  text += `Generated: ${new Date().toLocaleDateString()}\n`;
-  text += `${'='.repeat(40)}\n\n`;
-  if (state.home) text += `END POINT: ${state.home.label}\n\n`;
-  routes.forEach(rd => {
-    text += `--- ${rd.name} (${rd.totalMiles.toFixed(1)} mi, ~${fmtTime(rd.totalMinutes + rd.route.length * STOP_MIN)}) ---\n`;
-    const spots = rd.route.map(i => typeof i === 'number' ? state.SPOTS[i] : i);
-    spots.forEach((s, i) => {
-      const spot = typeof s === 'number' ? state.SPOTS[s] : s;
-      const vis = state.visitedSet.has(spot.id) ? '[x]' : '[ ]';
-      const leg = rd.legs ? rd.legs[(getStartLocation() ? 1 : 0) + i] : null;
-      const addrParts = [spot.street, spot.city, spot.state].filter(Boolean);
-      text += `  ${vis} ${i + 1}. ${addrParts.join(', ')}`;
-      if (leg) text += ` (${fmtMi(leg.distance)} mi, ~${fmtDur(leg.duration)})`;
-      text += '\n';
-    });
-    text += '\n';
-  });
-  text += `\nProgress: ${state.visitedSet.size}/${state.SPOTS.length} stops completed\n`;
-
-  const blob = new Blob([text], {type: 'text/plain'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = `routeflow-${new Date().toISOString().slice(0, 10)}.txt`;
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-  toast('Route exported');
-}
-
-function spotToAddr(sp) { return formatForMaps(sp); }
-
-export function exportToGoogleMaps() {
-  if (!state.currentRoutes.length) { toast('No routes to export'); return; }
-  if (state.activeFilter < 0 && state.currentRoutes.length > 1) {
-    toast('Select a single route to open in Google Maps');
-    return;
-  }
-
-  const rd = state.activeFilter >= 0 ? state.currentRoutes[state.activeFilter] : state.currentRoutes[0];
-  const stops = [];
-  for (const idx of rd.route) {
-    const sp = typeof idx === 'number' ? state.SPOTS[idx] : idx;
-    if (!state.visitedSet.has(sp.id)) stops.push(sp);
-  }
-  if (!stops.length) { toast('All stops visited!'); return; }
-
-  const allPoints = [];
-  const origin = getStartLocation();
-  if (origin) {
-    allPoints.push(`${origin.lat},${origin.lng}`);
-  } else {
-    allPoints.push(spotToAddr(stops[0]));
-  }
-  const stopsToInclude = origin ? stops : stops.slice(1);
-  for (const sp of stopsToInclude) {
-    allPoints.push(spotToAddr(sp));
-  }
-  if (state.home) {
-    allPoints.push(`${state.home.lat},${state.home.lng}`);
-  }
-
-  const gModes = {car: 'driving', bike: 'bicycling', walk: 'walking'};
-  const travelParam = gModes[state.travelMode] || 'driving';
-  const MAX_URL_LEN = 2000;
-  let url = 'https://www.google.com/maps/dir/' + allPoints.map(p => encodeURIComponent(p)).join('/') + `?travelmode=${travelParam}`;
-
-  if (url.length > MAX_URL_LEN) {
-    const coordPoints = [];
-    if (origin) coordPoints.push(`${origin.lat},${origin.lng}`);
-    else coordPoints.push(`${stops[0].lat},${stops[0].lng}`);
-    const available = origin ? stops : stops.slice(1);
-    for (const sp of available) {
-      coordPoints.push(`${sp.lat},${sp.lng}`);
-    }
-    if (state.home) coordPoints.push(`${state.home.lat},${state.home.lng}`);
-    let trimmed = coordPoints;
-    while (trimmed.length > 2) {
-      url = 'https://www.google.com/maps/dir/' + trimmed.join('/') + `?travelmode=${travelParam}`;
-      if (url.length <= MAX_URL_LEN) break;
-      trimmed = trimmed.slice(0, -1);
-    }
-    const included = trimmed.length - (origin ? 1 : 0) - (state.home ? 1 : 0);
-    if (included < stops.length) {
-      toast(`Opening ${included} of ${stops.length} stops in Google Maps`);
-    } else {
-      toast('Opening in Google Maps...');
-    }
-  } else {
-    toast('Opening in Google Maps...');
-  }
-  window.open(url, '_blank');
-}
-
-export function exportToAppleMaps() {
-  if (!state.currentRoutes.length) { toast('No routes to export'); return; }
-  if (state.activeFilter < 0 && state.currentRoutes.length > 1) {
-    toast('Select a single route to open in Apple Maps');
-    return;
-  }
-
-  const rd = state.activeFilter >= 0 ? state.currentRoutes[state.activeFilter] : state.currentRoutes[0];
-  const stops = [];
-  for (const idx of rd.route) {
-    const sp = typeof idx === 'number' ? state.SPOTS[idx] : idx;
-    if (!state.visitedSet.has(sp.id)) stops.push(sp);
-  }
-  if (!stops.length) { toast('All stops visited!'); return; }
-
-  const origin = getStartLocation();
-  const appleModes = {car: 'd', bike: 'b', walk: 'w'};
-  const params = new URLSearchParams({dirflg: appleModes[state.travelMode] || 'd'});
-
-  if (origin) {
-    params.set('saddr', `${origin.lat},${origin.lng}`);
-  } else {
-    params.set('saddr', `${stops[0].lat},${stops[0].lng}`);
-  }
-
-  const waypoints = (origin ? stops : stops.slice(1)).map(sp => `${sp.lat},${sp.lng}`);
-  if (state.home) waypoints.push(`${state.home.lat},${state.home.lng}`);
-  const daddr = waypoints.join('+to:');
-  const saddr = params.get('saddr');
-  const mode = appleModes[state.travelMode] || 'd';
-
-  const url = `https://maps.apple.com/?dirflg=${mode}&saddr=${saddr}&daddr=${daddr}`;
-  if (waypoints.length > 1) {
-    toast(`Opening ${waypoints.length} stops in Apple Maps...`);
-  } else {
-    toast('Opening in Apple Maps...');
-  }
-  window.open(url, '_blank');
-}
-
 export function computeMaxClusters() {
   const n = state.SPOTS.length;
   const MIN_PER_CLUSTER = 3;
@@ -540,79 +392,6 @@ export function computeMaxClusters() {
   return Math.max(2, Math.min(maxBySize, maxByCities));
 }
 
-// Home (end point) modal
-export function showHomeModal() {
-  document.getElementById('homeModal').classList.add('show');
-  document.getElementById('homeInput').value = state.home ? state.home.label : '';
-  document.getElementById('homeClearBtn').style.display = state.home ? 'block' : 'none';
-  setTimeout(() => document.getElementById('homeInput').focus(), 100);
-}
-export function hideHomeModal() { document.getElementById('homeModal').classList.remove('show'); }
-
-export async function confirmHome() {
-  const val = document.getElementById('homeInput').value.trim();
-  if (!val) {
-    state.home = null; localStorage.removeItem(STORE_H); hideHomeModal(); render();
-    toast('No end point set — route ends at last stop');
-    return;
-  }
-  const btn = document.getElementById('homeConfirmBtn');
-  btn.textContent = 'Finding...'; btn.disabled = true;
-  try {
-    const result = await geocodeFreeform(val);
-    btn.textContent = 'Set End'; btn.disabled = false;
-    if (result) {
-      state.home = {lat: result.lat, lng: result.lng, label: result.label || val};
-      saveJSON(STORE_H, state.home); hideHomeModal(); render();
-      toast('End point set');
-    } else {
-      document.getElementById('homeInput').style.borderColor = 'var(--red)';
-      setTimeout(() => document.getElementById('homeInput').style.borderColor = '', 1500);
-      toast('Address not found');
-    }
-  } catch {
-    btn.textContent = 'Set End'; btn.disabled = false;
-    toast('Geocoding failed');
-  }
-}
-
-// Start point modal
-export function showStartModal() {
-  document.getElementById('startModal').classList.add('show');
-  document.getElementById('startInput').value = state.startPoint ? state.startPoint.label : '';
-  document.getElementById('startClearBtn').style.display = state.startPoint ? 'block' : 'none';
-  setTimeout(() => document.getElementById('startInput').focus(), 100);
-}
-export function hideStartModal() { document.getElementById('startModal').classList.remove('show'); }
-
-export async function confirmStart() {
-  const val = document.getElementById('startInput').value.trim();
-  if (!val) {
-    state.startPoint = null; localStorage.removeItem('routeflow-start'); hideStartModal(); state.durationMatrix = null; render();
-    toast('Using GPS as start point');
-    return;
-  }
-  const btn = document.getElementById('startConfirmBtn');
-  btn.textContent = 'Finding...'; btn.disabled = true;
-  try {
-    const result = await geocodeFreeform(val);
-    btn.textContent = 'Set Start'; btn.disabled = false;
-    if (result) {
-      state.startPoint = {lat: result.lat, lng: result.lng, label: result.label || val};
-      saveJSON('routeflow-start', state.startPoint); hideStartModal(); state.durationMatrix = null; render();
-      toast('Start point set');
-    } else {
-      document.getElementById('startInput').style.borderColor = 'var(--red)';
-      setTimeout(() => document.getElementById('startInput').style.borderColor = '', 1500);
-      toast('Address not found');
-    }
-  } catch {
-    btn.textContent = 'Set Start'; btn.disabled = false;
-    toast('Geocoding failed');
-  }
-}
-
-// Bottom sheet
 export function setSheetState(s) {
   state.sheetState = s;
   const sheet = document.getElementById('bottomSheet');

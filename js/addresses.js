@@ -4,12 +4,31 @@ import { render, computeMaxClusters } from './ui.js';
 import { geocodeAddress } from './geocoder.js';
 
 let stagedAddresses = [];
+let importMode = 'append';
+
+function resetRouteState() {
+  state.durationMatrix = null;
+  state.osrmCache = {}; saveJSON(STORE_CACHE, state.osrmCache);
+  state.currentRoutes = [];
+}
+
+function updateClusterSlider() {
+  const slider = document.getElementById('clusterSlider');
+  const sliderVal = document.getElementById('clusterVal');
+  const newMax = computeMaxClusters();
+  slider.max = newMax; slider.setAttribute('max', newMax);
+  if (+slider.value > newMax) { slider.value = newMax; sliderVal.textContent = newMax; state.numClusters = newMax; }
+}
 
 export function showAddrModal() {
   document.getElementById('addrModal').classList.add('show');
   stagedAddresses = [];
   renderAddrPreview();
-  document.getElementById('addrReplaceNote').style.display = state.SPOTS.length ? 'flex' : 'none';
+  const hasExisting = state.SPOTS.length > 0;
+  document.getElementById('addrModeToggle').style.display = hasExisting ? 'flex' : 'none';
+  importMode = hasExisting ? 'append' : 'replace';
+  document.getElementById('addrModeAppend').classList.toggle('active', importMode === 'append');
+  document.getElementById('addrModeReplace').classList.toggle('active', importMode === 'replace');
   document.getElementById('addrPasteArea').value = '';
   document.getElementById('addrManualSearch').value = '';
   document.getElementById('addrManualStreet').value = '';
@@ -21,6 +40,12 @@ export function showAddrModal() {
   document.querySelectorAll('.addr-section').forEach(s => s.classList.remove('active'));
   document.querySelector('.addr-tab[data-tab="import"]').classList.add('active');
   document.getElementById('addrImportSection').classList.add('active');
+}
+
+export function setImportMode(mode) {
+  importMode = mode;
+  document.getElementById('addrModeAppend').classList.toggle('active', mode === 'append');
+  document.getElementById('addrModeReplace').classList.toggle('active', mode === 'replace');
 }
 
 export function hideAddrModal() {
@@ -307,27 +332,30 @@ async function geocodeStaged() {
 }
 
 function applyValidStops(valid) {
-  const newSpots = valid.map((a, i) => ({id: i + 1, street: a.street, city: a.city || '', state: a.state || '', zip: a.zip || '', lat: a.lat, lng: a.lng}));
-  state.SPOTS = newSpots;
-  saveJSON(STORE_SPOTS, state.SPOTS);
-
-  state.visitedSet.clear(); saveSet(STORE_V, state.visitedSet);
-  state.durationMatrix = null;
-  state.osrmCache = {}; saveJSON(STORE_CACHE, state.osrmCache);
-  state.currentRoutes = [];
-  state.numClusters = 1; state.activeFilter = -1;
-  const slider = document.getElementById('clusterSlider');
-  const sliderVal = document.getElementById('clusterVal');
-  slider.value = 1; sliderVal.textContent = '1';
-
-  const newMax = computeMaxClusters();
-  slider.max = newMax; slider.setAttribute('max', newMax);
-
-  const btn = document.getElementById('addrConfirmBtn');
-  btn.textContent = 'Apply Stops'; btn.disabled = false;
-  hideAddrModal();
-  toast(`${newSpots.length} stops loaded`);
-  render();
+  if (importMode === 'append' && state.SPOTS.length > 0) {
+    const maxId = Math.max(0, ...state.SPOTS.map(s => s.id));
+    const newSpots = valid.map((a, i) => ({id: maxId + i + 1, street: a.street, city: a.city || '', state: a.state || '', zip: a.zip || '', lat: a.lat, lng: a.lng}));
+    state.SPOTS = [...state.SPOTS, ...newSpots];
+    saveJSON(STORE_SPOTS, state.SPOTS);
+    resetRouteState();
+    updateClusterSlider();
+    hideAddrModal();
+    toast(`${newSpots.length} stops added (${state.SPOTS.length} total)`);
+    render();
+  } else {
+    const newSpots = valid.map((a, i) => ({id: i + 1, street: a.street, city: a.city || '', state: a.state || '', zip: a.zip || '', lat: a.lat, lng: a.lng}));
+    state.SPOTS = newSpots;
+    saveJSON(STORE_SPOTS, state.SPOTS);
+    state.visitedSet.clear(); saveSet(STORE_V, state.visitedSet);
+    resetRouteState();
+    state.numClusters = 1; state.activeFilter = -1;
+    document.getElementById('clusterSlider').value = 1;
+    document.getElementById('clusterVal').textContent = '1';
+    updateClusterSlider();
+    hideAddrModal();
+    toast(`${newSpots.length} stops loaded`);
+    render();
+  }
 }
 
 export function resetToDefaultStops() {
@@ -335,15 +363,11 @@ export function resetToDefaultStops() {
   state.SPOTS = [];
   localStorage.removeItem(STORE_SPOTS);
   state.visitedSet.clear(); saveSet(STORE_V, state.visitedSet);
-  state.durationMatrix = null;
-  state.osrmCache = {}; saveJSON(STORE_CACHE, state.osrmCache);
-  state.currentRoutes = [];
+  resetRouteState();
   state.numClusters = 1; state.activeFilter = -1;
-  const slider = document.getElementById('clusterSlider');
-  const sliderVal = document.getElementById('clusterVal');
-  slider.value = 1; sliderVal.textContent = '1';
-  const newMax = computeMaxClusters();
-  slider.max = newMax; slider.setAttribute('max', newMax);
+  document.getElementById('clusterSlider').value = 1;
+  document.getElementById('clusterVal').textContent = '1';
+  updateClusterSlider();
   hideAddrModal();
   toast('All stops cleared');
   render();

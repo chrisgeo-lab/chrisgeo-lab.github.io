@@ -1,10 +1,11 @@
-import { state, STORE_V, STORE_SPOTS, saveSet, saveJSON } from './state.js';
+import { state, STORE_V, saveSet, saveJSON, getStartLocation } from './state.js';
 import { toast, showError, hideError } from './utils.js';
 import { map } from './map.js';
-import { render, renderView, renderStopList, toggleVisited, exportRoute, exportToGoogleMaps, exportToAppleMaps, computeMaxClusters,
-  showHomeModal, hideHomeModal, confirmHome, showStartModal, hideStartModal, confirmStart,
+import { render, renderView, renderStopList, toggleVisited, computeMaxClusters,
   setSheetState, toggleRouteDropdown, closeRouteDropdown } from './ui.js';
-import { showAddrModal, hideAddrModal, resetToDefaultStops, setupAutocomplete, parsePastedText, addManualAddress, confirmAddresses, initAddressUI } from './addresses.js';
+import { exportRoute, exportToGoogleMaps, exportToAppleMaps } from './exports.js';
+import { showHomeModal, hideHomeModal, confirmHome, showStartModal, hideStartModal, confirmStart } from './modals.js';
+import { showAddrModal, hideAddrModal, resetToDefaultStops, setupAutocomplete, parsePastedText, addManualAddress, confirmAddresses, initAddressUI, setImportMode } from './addresses.js';
 import { startTour, shouldShowTour, resetTour, dismissTour, isTourActive } from './tour.js';
 
 // Mobile view helpers
@@ -82,7 +83,7 @@ document.getElementById('fitBoundsBtn').onclick = () => {
   const routes = state.activeFilter >= 0 ? [state.currentRoutes[state.activeFilter]] : state.currentRoutes;
   const bounds = [];
   routes.forEach(r => r.route.forEach(i => { const sp = typeof i === 'number' ? state.SPOTS[i] : i; bounds.push([sp.lat, sp.lng]); }));
-  const origin = state.startPoint || (state.gpsPos ? {lat: state.gpsPos.lat, lng: state.gpsPos.lng} : null);
+  const origin = getStartLocation();
   if (origin) bounds.push([origin.lat, origin.lng]);
   if (state.home) bounds.push([state.home.lat, state.home.lng]);
   if (!bounds.length) { const all = state.SPOTS.map(s => [s.lat, s.lng]); if (all.length) map.fitBounds(all, {padding: [60, 60]}); return; }
@@ -141,7 +142,7 @@ document.getElementById('searchInput').oninput = () => renderStopList();
 // Home modal
 document.getElementById('homeCancelBtn').onclick = hideHomeModal;
 document.getElementById('homeClearBtn').onclick = () => {
-  state.home = null; localStorage.removeItem('festival-home');
+  state.home = null; localStorage.removeItem('routeflow-home');
   hideHomeModal(); render();
   toast('End point removed — route won\'t loop');
 };
@@ -174,6 +175,8 @@ document.getElementById('addrManualAddBtn').onclick = addManualAddress;
 });
 document.getElementById('addrConfirmBtn').onclick = confirmAddresses;
 document.getElementById('addrResetDefaultBtn').onclick = resetToDefaultStops;
+document.getElementById('addrModeAppend').onclick = () => setImportMode('append');
+document.getElementById('addrModeReplace').onclick = () => setImportMode('replace');
 
 // Init address file drop zone and tabs
 initAddressUI();
@@ -267,7 +270,6 @@ document.addEventListener('touchend', () => {
 });
 
 // Travel mode toggle
-const travelModeBar = document.getElementById('travelModeBar');
 document.querySelectorAll('.travel-mode-btn').forEach(btn => {
   btn.onclick = () => {
     const mode = btn.dataset.mode;
@@ -336,9 +338,15 @@ document.getElementById('progressBar').style.width = `${state.SPOTS.length ? (st
 updateTravelModeUI();
 render();
 
-// Guided tour on first visit
+// Guided tour on first visit - show prompt instead of auto-starting
 if (shouldShowTour()) {
-  setTimeout(() => startTour(render), 1200);
+  setTimeout(() => {
+    const msg = document.getElementById('toast');
+    msg.innerHTML = 'First time here? <button class="toast-undo" onclick="window.resetTour();this.parentElement.classList.remove(\'show\')">Take a Tour</button>';
+    msg.classList.add('show');
+    setTimeout(() => msg.classList.remove('show'), 8000);
+    try { localStorage.setItem('routeflow-tour-complete', '1'); } catch {}
+  }, 1500);
 }
 
 // Allow re-triggering tour from console: window.resetTour()

@@ -10,7 +10,6 @@ export function hd(a, b) {
 }
 
 export function fmtMi(m) { return (m * 0.000621371).toFixed(1); }
-export function fmtMiShort(m) { const mi = m * 0.000621371; return mi < 0.1 ? `${Math.round(m * 3.28084)} ft` : `${mi.toFixed(1)} mi`; }
 export function fmtTime(min) { const h = Math.floor(min / 60), m = Math.round(min % 60); return h ? `${h}h ${m}m` : `${m} min`; }
 export function fmtDur(s) { if (s < 60) return '< 1 min'; const m = Math.round(s / 60); if (m < 60) return `${m} min`; return `${Math.floor(m / 60)}h ${m % 60}m`; }
 
