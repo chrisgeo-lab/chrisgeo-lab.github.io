@@ -59,12 +59,12 @@ export function renderView() {
   }
   if (state.home) {
     const mk = addMarker(state.home.lat, state.home.lng, homeIcon());
-    bindPopup(mk, `<div style="padding:10px;font-family:var(--font)"><div style="font-size:11px;color:#FF9500;font-weight:600">End Point</div><div style="font-size:14px;font-weight:600;margin-top:2px">${esc(state.home.label)}</div></div>`);
+    bindPopup(mk, `<div class="stop-popup"><div class="stop-popup-label" style="color:#FF9500">End Point</div><div class="stop-popup-street">${esc(state.home.label)}</div></div>`);
     bounds.push([state.home.lat, state.home.lng]);
   }
   if (state.startPoint) {
     const mk = addMarker(state.startPoint.lat, state.startPoint.lng, {html: '<div style="width:20px;height:20px;background:#007AFF;border:2px solid #fff;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff">&#9654;</div>'});
-    bindPopup(mk, `<div style="padding:10px;font-family:var(--font)"><div style="font-size:11px;color:#007AFF;font-weight:600">Start Point</div><div style="font-size:14px;font-weight:600;margin-top:2px">${esc(state.startPoint.label)}</div></div>`);
+    bindPopup(mk, `<div class="stop-popup"><div class="stop-popup-label" style="color:#007AFF">Start Point</div><div class="stop-popup-street">${esc(state.startPoint.label)}</div></div>`);
     bounds.push([state.startPoint.lat, state.startPoint.lng]);
   }
   if (gpsMarker) { gpsMarker.remove(); gpsMarker = null; }

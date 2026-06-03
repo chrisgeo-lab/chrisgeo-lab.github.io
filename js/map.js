@@ -21,13 +21,12 @@ export const map = new maplibregl.Map({
   touchZoomRotate: true,
   doubleClickZoom: true,
   touchPitch: false,
-  keyboard: true,
-  cooperativeGestures: false
+  keyboard: true
 });
 
+let mapLoaded = false;
 export const mapReady = new Promise(resolve => {
-  if (map.isStyleLoaded()) resolve();
-  else map.once('load', resolve);
+  map.once('load', () => { mapLoaded = true; resolve(); });
 });
 
 darkQuery.addEventListener('change', e => {
@@ -35,16 +34,18 @@ darkQuery.addEventListener('change', e => {
   map.once('style.load', () => restoreLayers());
 });
 
-
 let markers = [];
 let popups = [];
 let routeSources = [];
 let routeData = [];
 let sourceCounter = 0;
+let renderEpoch = 0;
 
 function restoreLayers() {
   add3DBuildings();
-  routeData.forEach(({id, geojson, color, weight}) => addRouteLayer(id, geojson, color, weight));
+  routeData.forEach(({id, geojson, color, weight}) => {
+    try { addRouteLayer(id, geojson, color, weight); } catch {}
+  });
 }
 
 function add3DBuildings() {
@@ -52,9 +53,7 @@ function add3DBuildings() {
   const layers = map.getStyle().layers;
   const labelLayer = layers.find(l => l.type === 'symbol' && (l.layout || {})['text-field']);
   const beforeId = labelLayer ? labelLayer.id : undefined;
-
   if (!map.getSource('carto')) return;
-
   map.addLayer({
     id: '3d-buildings',
     source: 'carto',
@@ -63,23 +62,17 @@ function add3DBuildings() {
     minzoom: 14,
     paint: {
       'fill-extrusion-color': darkQuery.matches ? '#2c2c2e' : '#ddd',
-      'fill-extrusion-height': [
-        'case',
-        ['has', 'render_height'], ['get', 'render_height'],
-        ['has', 'floors'], ['*', ['get', 'floors'], 3.5],
-        10
-      ],
+      'fill-extrusion-height': ['case', ['has', 'render_height'], ['get', 'render_height'], ['has', 'floors'], ['*', ['get', 'floors'], 3.5], 10],
       'fill-extrusion-base': ['case', ['has', 'render_min_height'], ['get', 'render_min_height'], 0],
       'fill-extrusion-opacity': 0.6
     }
   }, beforeId);
 }
 
-map.on('style.load', () => {
-  add3DBuildings();
-});
+map.on('style.load', () => { add3DBuildings(); });
 
 export function clearMap() {
+  renderEpoch++;
   markers.forEach(m => m.remove());
   markers = [];
   popups.forEach(p => p.remove());
@@ -116,7 +109,6 @@ export function addMarker(lat, lng, icon) {
 export function addPolyline(coords, color, weight = 5) {
   if (!coords || coords.length < 2) return null;
   const id = 'route-' + (++sourceCounter);
-
   const geojson = {
     type: 'Feature',
     geometry: {
@@ -127,37 +119,34 @@ export function addPolyline(coords, color, weight = 5) {
 
   routeData.push({id, geojson, color, weight});
   routeSources.push(id);
-  mapReady.then(() => {
+
+  const epoch = renderEpoch;
+  if (mapLoaded) {
     try { addRouteLayer(id, geojson, color, weight); } catch(e) { console.warn('Route layer failed:', e); }
-  });
+  } else {
+    mapReady.then(() => {
+      if (epoch !== renderEpoch) return;
+      try { addRouteLayer(id, geojson, color, weight); } catch(e) { console.warn('Route layer failed:', e); }
+    });
+  }
   return id;
 }
 
 function addRouteLayer(id, geojson, color, weight) {
   if (map.getSource(id)) return;
   map.addSource(id, {type: 'geojson', data: geojson});
-
   map.addLayer({
     id: id + '-outline',
     type: 'line',
     source: id,
-    paint: {
-      'line-color': '#000',
-      'line-width': weight + 3,
-      'line-opacity': 0.15
-    },
+    paint: {'line-color': '#000', 'line-width': weight + 3, 'line-opacity': 0.15},
     layout: {'line-cap': 'round', 'line-join': 'round'}
   });
-
   map.addLayer({
     id: id,
     type: 'line',
     source: id,
-    paint: {
-      'line-color': color,
-      'line-width': weight,
-      'line-opacity': 0.9
-    },
+    paint: {'line-color': color, 'line-width': weight, 'line-opacity': 0.9},
     layout: {'line-cap': 'round', 'line-join': 'round'}
   });
 }
@@ -184,7 +173,7 @@ export function setView(latlng, zoom, opts) {
   if (opts && opts.animate === false) {
     map.jumpTo({center, zoom});
   } else {
-    map.easeTo({center, zoom, duration: opts?.duration ? opts.duration * 1000 : 800});
+    map.easeTo({center, zoom, duration: 600});
   }
 }
 
@@ -202,14 +191,14 @@ export function fitBounds(bounds, opts) {
       if (opts.paddingBottomRight) { padding.right = opts.paddingBottomRight[0]; padding.bottom = opts.paddingBottomRight[1]; }
     }
     map.stop();
-    map.fitBounds(lngLatBounds, {padding, duration: 800});
+    map.fitBounds(lngLatBounds, {padding, duration: 0});
   } else {
     map.stop();
-    map.fitBounds(bounds, opts);
+    map.fitBounds(bounds, {...opts, duration: 0});
   }
 }
 
-export function zoomIn() { map.stop(); map.zoomTo(map.getZoom() + 1, {duration: 200}); }
-export function zoomOut() { map.stop(); map.zoomTo(map.getZoom() - 1, {duration: 200}); }
+export function zoomIn() { map.zoomTo(map.getZoom() + 1, {duration: 150}); }
+export function zoomOut() { map.zoomTo(map.getZoom() - 1, {duration: 150}); }
 export function closePopup() { popups.forEach(p => p.remove()); popups = []; }
 export function trackPopup(popup) { popups.push(popup); }
