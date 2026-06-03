@@ -3,7 +3,7 @@ import { esc, hd, fmtMi, fmtMiShort, fmtTime, fmtDur, toast, setLoading, showErr
 import { fetchTable, fetchRoute, buildHaversineMatrix, getFullDurationMatrix } from './routing.js';
 import { clusterUnvisited, tspWithMatrix } from './solver.js';
 import { map, clearMap, addMarker, addPolyline, stopIcon, homeIcon, gpsIcon, trackPopup } from './map.js';
-import { geocodeFreeform } from './geocoder.js';
+import { geocodeFreeform, formatForMaps } from './geocoder.js';
 
 function getStartLocation() {
   if (state.startPoint) return state.startPoint;
@@ -405,7 +405,8 @@ export function exportRoute() {
       const spot = typeof s === 'number' ? state.SPOTS[s] : s;
       const vis = state.visitedSet.has(spot.id) ? '[x]' : '[ ]';
       const leg = rd.legs ? rd.legs[(getStartLocation() ? 1 : 0) + i] : null;
-      text += `  ${vis} ${i + 1}. ${spot.street}, ${spot.city}`;
+      const addrParts = [spot.street, spot.city, spot.state].filter(Boolean);
+      text += `  ${vis} ${i + 1}. ${addrParts.join(', ')}`;
       if (leg) text += ` (${fmtMi(leg.distance)} mi, ~${fmtDur(leg.duration)})`;
       text += '\n';
     });
@@ -422,7 +423,7 @@ export function exportRoute() {
   toast('Route exported');
 }
 
-function spotToAddr(sp) { return `${sp.lat},${sp.lng}`; }
+function spotToAddr(sp) { return formatForMaps(sp); }
 
 export function exportToGoogleMaps() {
   if (!state.currentRoutes.length) { toast('No routes to export'); return; }
@@ -505,10 +506,11 @@ export function exportToAppleMaps() {
   if (origin) {
     params.set('saddr', `${origin.lat},${origin.lng}`);
   } else {
-    params.set('saddr', spotToAddr(stops[0]));
+    params.set('saddr', `${stops[0].lat},${stops[0].lng}`);
   }
 
-  const waypoints = (origin ? stops : stops.slice(1)).map(sp => spotToAddr(sp));
+  // Apple Maps uses +to: separator — coordinates are most reliable for multi-stop
+  const waypoints = (origin ? stops : stops.slice(1)).map(sp => `${sp.lat},${sp.lng}`);
   if (state.home) waypoints.push(`${state.home.lat},${state.home.lng}`);
   params.set('daddr', waypoints.join('+to:'));
 

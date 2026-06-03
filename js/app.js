@@ -165,6 +165,7 @@ document.getElementById('emptyImportBtn').onclick = showAddrModal;
 document.getElementById('importStopsInlineBtn').onclick = showAddrModal;
 document.getElementById('fabAddStops').onclick = showAddrModal;
 document.getElementById('addrCancelBtn').onclick = hideAddrModal;
+document.getElementById('addrCloseBtnX').onclick = hideAddrModal;
 document.getElementById('addrModal').onclick = e => { if (e.target.id === 'addrModal') hideAddrModal(); };
 document.getElementById('addrParseBtn').onclick = parsePastedText;
 document.getElementById('addrManualAddBtn').onclick = addManualAddress;

@@ -18,9 +18,18 @@ async function tryPhoton(query) {
   if (!r.ok) return null;
   const data = await r.json();
   if (!data.features || !data.features.length) return null;
-  const coords = data.features[0].geometry?.coordinates;
+  const f = data.features[0];
+  const coords = f.geometry?.coordinates;
   if (!coords || coords.length < 2) return null;
-  return {lat: coords[1], lng: coords[0]};
+  const p = f.properties || {};
+  return {
+    lat: coords[1],
+    lng: coords[0],
+    resolvedStreet: [p.housenumber, p.street || p.name].filter(Boolean).join(' '),
+    resolvedCity: p.city || p.locality || p.county || '',
+    resolvedState: p.state || '',
+    resolvedZip: p.postcode || ''
+  };
 }
 
 async function tryCensus(query) {
@@ -37,16 +46,22 @@ async function tryCensus(query) {
   const data = await r.json();
   const matches = data?.result?.addressMatches;
   if (!matches || !matches.length) return null;
-  const coords = matches[0].coordinates;
+  const match = matches[0];
+  const coords = match.coordinates;
   if (!coords) return null;
-  return {lat: coords.y, lng: coords.x};
+  const addr = match.matchedAddress || '';
+  return {
+    lat: coords.y,
+    lng: coords.x,
+    matchedAddress: addr
+  };
 }
 
 async function tryNominatim(query) {
   const elapsed = Date.now() - lastNominatimReq;
   if (elapsed < 1100) await new Promise(r => setTimeout(r, 1100 - elapsed));
   lastNominatimReq = Date.now();
-  const params = new URLSearchParams({format: 'json', q: query, limit: '1', countrycodes: 'us'});
+  const params = new URLSearchParams({format: 'json', q: query, limit: '1', addressdetails: '1'});
   const r = await fetch(`${NOMINATIM_URL}?${params}`, {headers: NOMINATIM_HEADERS});
   if (r.status === 429) {
     await new Promise(r2 => setTimeout(r2, 3000));
@@ -54,26 +69,50 @@ async function tryNominatim(query) {
     const retry = await fetch(`${NOMINATIM_URL}?${params}`, {headers: NOMINATIM_HEADERS});
     if (!retry.ok) return null;
     const data = await retry.json();
-    return data.length ? {lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon)} : null;
+    return parseNominatimResult(data);
   }
   if (!r.ok) return null;
   const data = await r.json();
-  return data.length ? {lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon)} : null;
+  return parseNominatimResult(data);
+}
+
+function parseNominatimResult(data) {
+  if (!data.length) return null;
+  const item = data[0];
+  const a = item.address || {};
+  return {
+    lat: parseFloat(item.lat),
+    lng: parseFloat(item.lon),
+    resolvedStreet: [a.house_number, a.road].filter(Boolean).join(' '),
+    resolvedCity: a.city || a.town || a.village || a.municipality || '',
+    resolvedState: a.state || '',
+    resolvedZip: a.postcode || ''
+  };
+}
+
+function normalizeAddress(str) {
+  return str
+    .replace(/\./g, '')
+    .replace(/\b(apt|suite|ste|unit|#)\s*\S*/gi, '')
+    .trim();
+}
+
+function buildQuery(addr) {
+  return [addr.street, addr.city, addr.state, addr.zip].filter(Boolean).join(', ');
 }
 
 export async function geocodeAddress(addr) {
-  const parts = [addr.street, addr.city, addr.state, addr.zip].filter(Boolean);
-  const query = parts.join(', ');
+  const query = buildQuery(addr);
   if (!query) return null;
+  const cleaned = normalizeAddress(query);
 
-  // Try Photon first (best fuzzy matching)
+  // Try Photon first (fastest, best fuzzy matching)
   try {
     const result = await tryPhoton(query);
     if (result) return result;
   } catch {}
 
-  // Try with cleaned query (remove periods from abbreviations)
-  const cleaned = query.replace(/\./g, '');
+  // Try cleaned query with Photon
   if (cleaned !== query) {
     try {
       const result = await tryPhoton(cleaned);
@@ -81,13 +120,21 @@ export async function geocodeAddress(addr) {
     } catch {}
   }
 
-  // Try US Census Geocoder (excellent for US addresses)
+  // Try without ZIP (sometimes ZIP mismatch causes failures)
+  if (addr.zip) {
+    const noZip = [addr.street, addr.city, addr.state].filter(Boolean).join(', ');
+    try {
+      const result = await tryPhoton(noZip);
+      if (result) return result;
+    } catch {}
+  }
+
+  // US Census Geocoder (excellent for US street addresses)
   try {
     const result = await tryCensus(query);
     if (result) return result;
   } catch {}
 
-  // Try without ZIP (sometimes ZIP mismatches cause failures)
   if (addr.zip) {
     const noZip = [addr.street, addr.city, addr.state].filter(Boolean).join(', ');
     try {
@@ -102,9 +149,9 @@ export async function geocodeAddress(addr) {
     if (result) return result;
   } catch {}
 
-  // Final attempt: Nominatim without ZIP and periods
+  // Final attempt: Nominatim without ZIP and dots
   if (addr.zip || /\./.test(query)) {
-    const lastTry = [addr.street, addr.city, addr.state].filter(Boolean).join(', ').replace(/\./g, '');
+    const lastTry = normalizeAddress([addr.street, addr.city, addr.state].filter(Boolean).join(', '));
     try {
       const result = await tryNominatim(lastTry);
       if (result) return result;
@@ -118,10 +165,14 @@ export async function geocodeFreeform(text) {
   if (!text || !text.trim()) return null;
   const query = text.trim();
 
-  // Check for raw coordinates
+  // Check for raw coordinates (lat, lng)
   const coords = query.match(/^\s*(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)\s*$/);
   if (coords) {
-    return {lat: parseFloat(coords[1]), lng: parseFloat(coords[2]), label: query};
+    const lat = parseFloat(coords[1]);
+    const lng = parseFloat(coords[2]);
+    if (Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
+      return {lat, lng, label: query};
+    }
   }
 
   // Try Photon
@@ -142,5 +193,24 @@ export async function geocodeFreeform(text) {
     if (result) return {...result, label: query};
   } catch {}
 
+  // Try cleaned version
+  const cleaned = normalizeAddress(query);
+  if (cleaned !== query) {
+    try {
+      const result = await tryPhoton(cleaned);
+      if (result) return {...result, label: query};
+    } catch {}
+  }
+
   return null;
+}
+
+export function formatForMaps(sp) {
+  const parts = [sp.street];
+  if (sp.city) parts.push(sp.city);
+  if (sp.state) parts.push(sp.state);
+  if (sp.zip) parts.push(sp.zip);
+  const addr = parts.filter(Boolean).join(', ');
+  if (addr && addr.length > 5) return addr;
+  return `${sp.lat},${sp.lng}`;
 }
