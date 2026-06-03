@@ -27,13 +27,15 @@ body{
   font-family:var(--font);background:#f2f2f7;color:var(--text);
   height:100vh;height:100dvh;overflow:hidden;position:relative;
   padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
-  -webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;user-select:none
+  -webkit-tap-highlight-color:transparent;-webkit-touch-callout:none
 }
+#map{user-select:auto}
+.bottom-sheet,.top-bar,.map-controls,.mobile-nav,.modal-overlay,.tour-tooltip{user-select:none}
 @media(prefers-color-scheme:dark){body{background:#000}}
 
-#map{position:absolute;inset:0;z-index:0}
-.maplibregl-ctrl-bottom-left{opacity:.7;font-size:10px}
-.maplibregl-ctrl-attrib a{color:var(--secondary)}
+#map{position:absolute;inset:0;z-index:1}
+.maplibregl-ctrl-bottom-left,.maplibregl-ctrl-bottom-right,
+.maplibregl-ctrl-top-left,.maplibregl-ctrl-top-right{display:none !important}
 
 /* Floating map controls */
 .map-controls{
@@ -511,30 +513,91 @@ body{
 .modal-btn-danger:hover{background:rgba(255,59,48,.08)}
 .modal-btn-sm{font-size:12px;padding:8px 14px}
 
-/* Point mode tabs (Start/End modals) */
+/* Point modal (Start/End) */
+.point-modal{padding:0;overflow:hidden;max-width:420px}
+.point-modal-header{
+  display:flex;align-items:center;gap:14px;padding:24px 24px 0
+}
+.point-modal-icon{
+  width:40px;height:40px;border-radius:12px;display:flex;
+  align-items:center;justify-content:center;font-size:16px;color:#fff;flex-shrink:0
+}
+.point-modal-icon--start{background:linear-gradient(135deg,#007AFF,#5856D6)}
+.point-modal-icon--end{background:linear-gradient(135deg,#FF9500,#FF6482)}
+.point-modal-header h3{font-size:20px;font-weight:700;letter-spacing:-.02em;margin:0}
+.point-modal-desc{font-size:13px;color:var(--secondary);margin-top:2px}
+.point-modal-current{
+  display:flex;align-items:center;gap:8px;margin:14px 24px 0;
+  padding:10px 14px;border-radius:10px;background:var(--fill);font-size:13px
+}
+.point-modal-current-label{color:var(--secondary);font-weight:500}
+.point-modal-current-value{color:var(--text);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.point-modal-footer{
+  display:flex;gap:8px;padding:16px 24px;border-top:1px solid var(--separator);
+  justify-content:flex-end;background:var(--card-solid)
+}
+.point-modal-btn-icon{margin-right:4px}
+
+/* Point mode tabs */
 .point-mode-tabs{
-  display:flex;gap:4px;margin-bottom:16px
+  display:flex;gap:4px;padding:16px 24px 0
 }
 .point-mode-tab{
-  flex:1;padding:10px 8px;font-size:12px;font-weight:600;text-align:center;
+  flex:1;padding:10px 6px;font-size:11px;font-weight:600;text-align:center;
   background:var(--fill);border:none;cursor:pointer;color:var(--secondary);
-  border-radius:8px;transition:all .15s;font-family:var(--font)
+  border-radius:10px;transition:all .15s;font-family:var(--font);
+  display:flex;flex-direction:column;align-items:center;gap:4px
 }
 .point-mode-tab.active{background:var(--blue);color:#fff;box-shadow:0 2px 8px rgba(0,122,255,.25)}
 .point-mode-tab:hover:not(.active){background:var(--separator);color:var(--text)}
 .point-mode-tab:active{transform:scale(.96)}
-.point-mode-content{margin-bottom:4px}
-.point-mode-section{display:none}
+.point-mode-tab-icon{font-size:16px;line-height:1}
+.point-mode-tab-text{font-size:10px;font-weight:600;letter-spacing:.01em}
+
+/* Point mode content sections */
+.point-mode-content{padding:0 24px 16px}
+.point-mode-section{display:none;padding-top:16px}
 .point-mode-section.active{display:block}
-.point-mode-hint{font-size:13px;color:var(--secondary);padding:8px 0;line-height:1.5}
-.point-stop-list{max-height:180px;overflow-y:auto;border:1px solid var(--separator);border-radius:10px}
+.point-mode-hint{
+  font-size:13px;color:var(--secondary);line-height:1.6;
+  display:flex;align-items:flex-start;gap:10px;
+  padding:12px 14px;border-radius:10px;background:var(--fill)
+}
+.point-mode-hint--small{
+  font-size:11px;margin-top:10px;padding:8px 12px;background:none;color:var(--tertiary)
+}
+.point-mode-hint-icon{font-size:16px;flex-shrink:0;line-height:1.3}
+
+/* Stop list in point modals */
+.point-stop-search-wrap{margin-bottom:10px}
+.point-stop-search{
+  width:100%;padding:10px 12px;border-radius:10px;border:none;
+  background:var(--fill);color:var(--text);font-size:14px;
+  font-family:var(--font);outline:none;transition:box-shadow .2s,background .2s
+}
+.point-stop-search:focus{background:var(--bg);box-shadow:0 0 0 3px rgba(0,122,255,.12)}
+.point-stop-search::placeholder{color:var(--tertiary)}
+.point-stop-list{
+  max-height:200px;overflow-y:auto;border:1px solid var(--separator);
+  border-radius:12px;background:var(--bg)
+}
 .point-stop-item{
-  padding:12px 14px;cursor:pointer;border-bottom:1px solid var(--separator);
-  font-size:14px;color:var(--text);transition:background .1s
+  padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--separator);
+  display:flex;align-items:center;gap:10px;transition:background .1s
 }
 .point-stop-item:last-child{border-bottom:none}
 .point-stop-item:hover{background:var(--fill)}
-.point-stop-item.selected{background:rgba(0,122,255,.08);color:var(--blue);font-weight:600}
+.point-stop-item.selected{background:rgba(0,122,255,.08);outline:2px solid var(--blue);outline-offset:-2px}
+.point-stop-item-num{
+  width:24px;height:24px;border-radius:50%;background:var(--tertiary);color:#fff;
+  font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0
+}
+.point-stop-item.selected .point-stop-item-num{background:var(--blue)}
+.point-stop-item-info{flex:1;min-width:0}
+.point-stop-item-name{font-size:14px;font-weight:500;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.point-stop-item-city{font-size:11px;color:var(--secondary);margin-top:1px}
+.point-stop-item.selected .point-stop-item-name{color:var(--blue);font-weight:600}
+.point-stop-empty{padding:20px;text-align:center;font-size:13px;color:var(--tertiary)}
 
 /* Loading */
 .loading-indicator{
@@ -1013,15 +1076,7 @@ body{
 }
 @keyframes geo-shimmer{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
 
-/* Guided Tour */
-.tour-overlay{
-  position:fixed;inset:0;z-index:9000;cursor:pointer
-}
-.tour-overlay-svg{
-  position:absolute;inset:0;width:100%;height:100%
-}
-.tour-cutout{transition:all .4s cubic-bezier(.4,0,.2,1)}
-
+/* Guided Tour — non-blocking tooltip only (no overlay) */
 .tour-tooltip{
   position:fixed;z-index:9001;
   width:320px;max-width:calc(100vw - 32px);
@@ -1050,7 +1105,7 @@ body{
   letter-spacing:-.2px
 }
 .tour-tooltip-body{
-  font-size:14px;color:var(--secondary);line-height:1.55;margin-bottom:20px
+  font-size:14px;color:var(--secondary);line-height:1.6;margin-bottom:20px
 }
 .tour-tooltip-footer{
   display:flex;align-items:center;justify-content:space-between;gap:12px
@@ -1072,11 +1127,9 @@ body{
 .tour-btn-back:hover{background:rgba(120,120,128,.18)}
 .tour-btn-skip{background:none;color:var(--secondary);padding:9px 10px}
 .tour-btn-skip:hover{color:var(--text)}
-body.tour-active .bottom-sheet,
-body.tour-active .top-bar,
-body.tour-active .map-controls,
-body.tour-active .fab-add-stops{
-  pointer-events:none
+.tour-highlight{
+  outline:3px solid var(--blue);outline-offset:4px;border-radius:var(--radius-xs);
+  transition:outline-color .3s
 }
 
 @media(max-width:767px){
@@ -1097,6 +1150,31 @@ body.tour-active .fab-add-stops{
   .tour-tooltip-title{font-size:16px}
   .tour-tooltip-body{font-size:13px;margin-bottom:16px}
 }
+
+/* Loading screen */
+.app-loading{
+  position:fixed;inset:0;z-index:10000;
+  background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:20px;transition:opacity .4s ease;
+}
+.app-loading.hidden{opacity:0;pointer-events:none}
+.app-loading-icon{
+  width:56px;height:56px;border-radius:14px;
+  background:var(--blue);display:flex;align-items:center;justify-content:center;
+  box-shadow:0 8px 24px rgba(0,122,255,.25)
+}
+.app-loading-icon svg{width:28px;height:28px}
+.app-loading-text{font-size:14px;color:var(--secondary);font-weight:500}
+.app-loading-bar{
+  width:120px;height:3px;background:var(--fill);border-radius:2px;overflow:hidden
+}
+.app-loading-bar-fill{
+  height:100%;width:30%;background:var(--blue);border-radius:2px;
+  animation:loading-slide 1s ease-in-out infinite
+}
+@keyframes loading-slide{0%{transform:translateX(-100%)}100%{transform:translateX(400%)}}
+@media(prefers-color-scheme:dark){.app-loading{background:#000}}
 
 @media(max-width:767px){
   .addr-modal{
