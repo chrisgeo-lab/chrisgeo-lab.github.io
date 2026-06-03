@@ -8,7 +8,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://unpkg.com; style-src 'self' 'unsafe-inline' https://unpkg.com; img-src 'self' data: blob: https://*.cartocdn.com https://basemaps.cartocdn.com; connect-src 'self' https://router.project-osrm.org https://routing.openstreetmap.de https://nominatim.openstreetmap.org https://photon.komoot.io https://geocoding.geo.census.gov https://*.cartocdn.com https://basemaps.cartocdn.com; worker-src 'self' blob:; font-src 'self' data:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' https://unpkg.com; style-src 'self' 'unsafe-inline' https://unpkg.com; img-src 'self' data: blob: https://*.cartocdn.com https://basemaps.cartocdn.com; connect-src 'self' https://router.project-osrm.org https://routing.openstreetmap.de https://nominatim.openstreetmap.org https://photon.komoot.io https://geocoding.geo.census.gov https://*.cartocdn.com https://basemaps.cartocdn.com; worker-src 'self' blob:; child-src blob:; font-src 'self' data:">
 <meta name="description" content="Plan multi-stop routes with automatic ordering, route splitting, and turn-by-turn export.">
 <meta property="og:title" content="RouteFlow - Multi-Stop Route Planner">
 <meta property="og:description" content="Plan multi-stop routes with automatic ordering, route splitting, and turn-by-turn export.">
@@ -160,17 +160,27 @@
 <div class="modal-overlay" id="homeModal" role="dialog" aria-modal="true" aria-labelledby="homeModalTitle">
   <div class="modal">
     <h3 id="homeModalTitle">Set End Point</h3>
-    <p>Where should your route end? Leave blank to finish at the last stop.</p>
-    <div class="addr-autocomplete">
-      <input type="text" class="modal-input" id="homeInput" placeholder="e.g. 123 Main St, Boston, MA" autocomplete="off">
-      <div class="addr-ac-list" id="homeAcList"></div>
+    <p>Where should your route end?</p>
+    <div class="point-mode-tabs" id="homeModeTabs">
+      <button class="point-mode-tab active" data-mode="none">None</button>
+      <button class="point-mode-tab" data-mode="stop">Pick a Stop</button>
+      <button class="point-mode-tab" data-mode="address">Custom Address</button>
     </div>
-    <div style="font-size:11px;color:var(--secondary);margin-top:8px;display:flex;align-items:center;gap:6px">
-      <span style="color:var(--blue)">&#9432;</span> Route will loop back here after all stops
+    <div class="point-mode-content" id="homeModeContent">
+      <div class="point-mode-section active" data-mode="none">
+        <div class="point-mode-hint">Route ends at the last stop (no loop).</div>
+      </div>
+      <div class="point-mode-section" data-mode="stop">
+        <div class="point-stop-list" id="homeStopList"></div>
+      </div>
+      <div class="point-mode-section" data-mode="address">
+        <div class="addr-autocomplete">
+          <input type="text" class="modal-input" id="homeInput" placeholder="e.g. 123 Main St, Boston, MA" autocomplete="off">
+          <div class="addr-ac-list" id="homeAcList"></div>
+        </div>
+      </div>
     </div>
     <div class="modal-actions">
-      <button class="modal-btn modal-btn-danger" id="homeClearBtn" style="display:none">Remove End</button>
-      <div style="flex:1"></div>
       <button class="modal-btn modal-btn-cancel" id="homeCancelBtn">Cancel</button>
       <button class="modal-btn modal-btn-primary" id="homeConfirmBtn">Set End</button>
     </div>
@@ -181,17 +191,27 @@
 <div class="modal-overlay" id="startModal" role="dialog" aria-modal="true" aria-labelledby="startModalTitle">
   <div class="modal">
     <h3 id="startModalTitle">Set Start Point</h3>
-    <p>By default, your GPS location is used. Enter an address to start from somewhere else.</p>
-    <div class="addr-autocomplete">
-      <input type="text" class="modal-input" id="startInput" placeholder="Leave blank for GPS (default)" autocomplete="off">
-      <div class="addr-ac-list" id="startAcList"></div>
+    <p>Where does your route begin?</p>
+    <div class="point-mode-tabs" id="startModeTabs">
+      <button class="point-mode-tab active" data-mode="gps">Current Location</button>
+      <button class="point-mode-tab" data-mode="stop">Pick a Stop</button>
+      <button class="point-mode-tab" data-mode="address">Custom Address</button>
     </div>
-    <div style="font-size:11px;color:var(--secondary);margin-top:8px;display:flex;align-items:center;gap:6px">
-      <span style="color:var(--blue)">&#9432;</span> Route order is optimized from this point
+    <div class="point-mode-content" id="startModeContent">
+      <div class="point-mode-section active" data-mode="gps">
+        <div class="point-mode-hint">Route starts from your GPS location.</div>
+      </div>
+      <div class="point-mode-section" data-mode="stop">
+        <div class="point-stop-list" id="startStopList"></div>
+      </div>
+      <div class="point-mode-section" data-mode="address">
+        <div class="addr-autocomplete">
+          <input type="text" class="modal-input" id="startInput" placeholder="Enter an address" autocomplete="off">
+          <div class="addr-ac-list" id="startAcList"></div>
+        </div>
+      </div>
     </div>
     <div class="modal-actions">
-      <button class="modal-btn modal-btn-danger" id="startClearBtn" style="display:none">Use GPS</button>
-      <div style="flex:1"></div>
       <button class="modal-btn modal-btn-cancel" id="startCancelBtn">Cancel</button>
       <button class="modal-btn modal-btn-primary" id="startConfirmBtn">Set Start</button>
     </div>

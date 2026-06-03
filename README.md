@@ -1,63 +1,84 @@
 # RouteFlow
 
-Multi-stop route planner with smart clustering, real-time optimization, and offline support. Built as a client-side PWA — no backend required.
+Multi-stop route planner with clustering, real-time optimization, and offline support. Static PWA — no backend, no build step.
 
 ## Features
 
-- **Route Optimization** — Solves TSP (Traveling Salesman Problem) with 2-opt and or-opt improvements
-- **Multi-Profile Routing** — Driving, cycling, and walking via OSRM
-- **Geographic Clustering** — Split stops into multiple routes using k-medoids on travel-time matrices
-- **Multi-Provider Geocoding** — Photon, US Census, and Nominatim with automatic fallback
-- **Address Import** — CSV, Excel, TSV file import; paste lists; manual entry with autocomplete
-- **Offline Support** — Service worker caches app shell; OSRM route cache in localStorage
-- **Export** — Google Maps, Apple Maps (multi-stop), and text file export
-- **3D Buildings** — MapLibre GL with CARTO vector tiles and extruded buildings at zoom 14+
-- **Progress Tracking** — Mark stops visited, track completion, celebrate on finish
-- **Dark Mode** — Automatic theme switching via `prefers-color-scheme`
-- **Guided Tour** — Interactive onboarding with Bay Area demo data
+- **Route Optimization** — TSP solver with 2-opt and or-opt improvements
+- **Multi-Profile Routing** — Driving, cycling, walking via OSRM
+- **Route Splitting** — k-medoids clustering to divide stops into area-based groups
+- **Geocoding** — Photon, US Census, Nominatim with automatic fallback
+- **Address Import** — CSV, Excel, TSV; paste lists; manual entry with autocomplete
+- **Offline Support** — Service worker caches the app; OSRM responses cached in localStorage
+- **Navigation Export** — Google Maps and Apple Maps with correct travel mode
+- **3D Buildings** — MapLibre GL with CARTO vector tiles, extruded at zoom 14+
+- **Progress Tracking** — Mark stops done, track completion
+- **Dark Mode** — Automatic via `prefers-color-scheme`
+- **Guided Tour** — Interactive onboarding with SF demo data
+- **Accessibility** — Focus trapping in modals, ARIA labels, keyboard navigation
 
 ## Quick Start
 
-Serve statically — no build step needed:
+No build step. Serve statically:
 
 ```bash
-# Any static server works
 npx serve .
+# or
 python -m http.server 8000
 ```
 
-Open `http://localhost:8000` and add stops via the Import button.
+Open `http://localhost:8000`. Deploy to GitHub Pages by pushing to the repo.
+
+## Running Tests
+
+Open `tests/index.html` in any browser (served over HTTP). Tests cover the solver, address parsing, and utility functions. No Node or test runner required.
+
+```bash
+# If using a local server:
+open http://localhost:8000/tests/
+```
 
 ## Architecture
 
 ```
-index.html          Entry point (single page)
-css/styles.css      All styles (Apple Maps design language)
+index.html            Entry point
+css/styles.css        All styles
 js/
-  app.js            Event wiring and initialization
-  state.js          Central state object and localStorage persistence
-  ui.js             Rendering (map markers, stop list, stats, modals)
-  map.js            MapLibre GL setup, markers, polylines, 3D buildings
-  routing.js        OSRM table/route API with multi-server fallback
-  solver.js         TSP solver (nearest-neighbor + 2-opt + or-opt) and clustering
-  geocoder.js       Multi-provider geocoding (Photon → Census → Nominatim)
-  addresses.js      Address import/parse/geocode workflow
-  tour.js           Guided tour with demo data
-  utils.js          Formatting, escaping, toast notifications
-sw.js               Service worker (cache-first for app shell)
-manifest.json       PWA manifest
+  app.js              Event wiring and initialization
+  state.js            Central state, localStorage persistence, config
+  planner.js          Route orchestration (matrix → cluster → solve → fetch)
+  ui.js               Rendering (map view, stop list, stats)
+  map.js              MapLibre GL setup, markers, polylines, 3D buildings
+  routing.js          OSRM table/route API with retry and multi-server fallback
+  solver.js           TSP (nearest-neighbor + 2-opt + or-opt) and k-medoids clustering
+  geocoder.js         Multi-provider geocoding cascade
+  addresses.js        Import/parse/geocode workflow and modal UI
+  address-parse.js    Pure address parsing and state normalization (testable)
+  modals.js           Home/start point modal logic
+  exports.js          Google Maps, Apple Maps, text file export
+  tour.js             Guided tour with demo data and keyboard nav
+  utils.js            Formatting, toasts, focus trapping
+  fallback.js         Graceful error if MapLibre fails to load
+sw.js                 Service worker (cache-first for shell, network-first for APIs)
+manifest.json         PWA manifest
+tests/
+  index.html          Browser-native test runner
+  runner.js           Minimal describe/it/expect framework
+  solver.test.js      TSP and clustering tests
+  addresses.test.js   Address parsing tests
+  utils.test.js       Formatting and haversine tests
 ```
 
 ## External Services
 
-All free, no API keys required:
+All free, no API keys:
 
 | Service | Purpose |
 |---------|---------|
-| [OSRM](https://router.project-osrm.org) | Driving route/table API |
-| [routing.openstreetmap.de](https://routing.openstreetmap.de) | Bike/walk OSRM profiles |
-| [Photon](https://photon.komoot.io) | Primary geocoder (fast, fuzzy) |
-| [US Census Geocoder](https://geocoding.geo.census.gov) | US street address fallback |
+| [OSRM Demo](https://router.project-osrm.org) | Driving route/table API |
+| [routing.openstreetmap.de](https://routing.openstreetmap.de) | Bike and walk OSRM instances |
+| [Photon](https://photon.komoot.io) | Primary geocoder |
+| [US Census](https://geocoding.geo.census.gov) | US address fallback |
 | [Nominatim](https://nominatim.openstreetmap.org) | Last-resort geocoder |
 | [CARTO](https://basemaps.cartocdn.com) | Vector tile basemap |
 
@@ -66,15 +87,21 @@ All free, no API keys required:
 | Key | Action |
 |-----|--------|
 | `H` | Set end point |
-| `+` / `-` | Zoom in/out |
-| `1`–`9` | Switch route filter |
+| `+` / `-` | Zoom |
+| `1`–`9` | Switch route |
 | `E` / `e` | Export text / Google Maps |
-| `?` | Start guided tour |
-| `Esc` | Close modal / collapse panel |
+| `?` | Guided tour |
+| `Esc` | Close / collapse |
+
+## Limits
+
+- Max 100 stops per session
+- Geocoding requires a US state in each address
+- OSRM demo servers may rate-limit; falls back to haversine estimates
 
 ## Browser Support
 
-Modern browsers with ES modules support (Chrome 80+, Firefox 78+, Safari 14+, Edge 80+).
+ES modules required: Chrome 80+, Firefox 78+, Safari 14+, Edge 80+.
 
 ## License
 
