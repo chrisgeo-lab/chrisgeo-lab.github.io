@@ -169,6 +169,7 @@ export function renderView() {
   updateProgress();
   updateStopsInfo();
   updateEmptyState();
+  document.getElementById('travelModeBar').classList.toggle('show', state.SPOTS.length > 0);
 }
 
 function renderFilterBar() {
@@ -232,6 +233,9 @@ function renderStats() {
   document.getElementById('statStops').textContent = totalStops;
   document.getElementById('statDone').textContent = done;
   document.getElementById('routeSummary').style.display = 'flex';
+  const modeLabels = {car: 'Drive', bike: 'Bike', walk: 'Walk'};
+  const timeLabel = document.querySelector('#routeSummary .route-stat:nth-child(2) .route-stat-label');
+  if (timeLabel) timeLabel.textContent = modeLabels[state.travelMode] || 'Drive';
   const endLabel = state.home ? ` &middot; &#8594; ${esc(state.home.label.split(',')[0])}` : '';
   document.getElementById('topSubtitle').innerHTML = `${done}/${totalStops} stops &middot; ${totalMi.toFixed(1)} mi${endLabel}`;
 }
@@ -455,8 +459,10 @@ export function exportToGoogleMaps() {
     allPoints.push(`${state.home.lat},${state.home.lng}`);
   }
 
+  const gModes = {car: 'driving', bike: 'bicycling', walk: 'walking'};
+  const travelParam = gModes[state.travelMode] || 'driving';
   const MAX_URL_LEN = 2000;
-  let url = 'https://www.google.com/maps/dir/' + allPoints.map(p => encodeURIComponent(p)).join('/');
+  let url = 'https://www.google.com/maps/dir/' + allPoints.map(p => encodeURIComponent(p)).join('/') + `?travelmode=${travelParam}`;
 
   if (url.length > MAX_URL_LEN) {
     const coordPoints = [];
@@ -469,7 +475,7 @@ export function exportToGoogleMaps() {
     if (state.home) coordPoints.push(`${state.home.lat},${state.home.lng}`);
     let trimmed = coordPoints;
     while (trimmed.length > 2) {
-      url = 'https://www.google.com/maps/dir/' + trimmed.join('/') + '/';
+      url = 'https://www.google.com/maps/dir/' + trimmed.join('/') + `?travelmode=${travelParam}`;
       if (url.length <= MAX_URL_LEN) break;
       trimmed = trimmed.slice(0, -1);
     }
@@ -501,7 +507,8 @@ export function exportToAppleMaps() {
   if (!stops.length) { toast('All stops visited!'); return; }
 
   const origin = getStartLocation();
-  const params = new URLSearchParams({dirflg: 'd'});
+  const appleModes = {car: 'd', bike: 'b', walk: 'w'};
+  const params = new URLSearchParams({dirflg: appleModes[state.travelMode] || 'd'});
 
   if (origin) {
     params.set('saddr', `${origin.lat},${origin.lng}`);
@@ -509,13 +516,18 @@ export function exportToAppleMaps() {
     params.set('saddr', `${stops[0].lat},${stops[0].lng}`);
   }
 
-  // Apple Maps uses +to: separator — coordinates are most reliable for multi-stop
   const waypoints = (origin ? stops : stops.slice(1)).map(sp => `${sp.lat},${sp.lng}`);
   if (state.home) waypoints.push(`${state.home.lat},${state.home.lng}`);
-  params.set('daddr', waypoints.join('+to:'));
+  const daddr = waypoints.join('+to:');
+  const saddr = params.get('saddr');
+  const mode = appleModes[state.travelMode] || 'd';
 
-  const url = 'https://maps.apple.com/?' + params.toString();
-  toast('Opening in Apple Maps...');
+  const url = `https://maps.apple.com/?dirflg=${mode}&saddr=${saddr}&daddr=${daddr}`;
+  if (waypoints.length > 1) {
+    toast(`Opening ${waypoints.length} stops in Apple Maps...`);
+  } else {
+    toast('Opening in Apple Maps...');
+  }
   window.open(url, '_blank');
 }
 

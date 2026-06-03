@@ -1,10 +1,23 @@
+import { state } from './state.js';
+
 const TOUR_KEY = 'routeflow-tour-complete';
+
+const DEMO_SPOTS = [
+  {id: 1, street: '1 Ferry Building', city: 'San Francisco', state: 'CA', zip: '94111', lat: 37.7955, lng: -122.3937},
+  {id: 2, street: '3251 20th Ave', city: 'San Francisco', state: 'CA', zip: '94132', lat: 37.7295, lng: -122.4780},
+  {id: 3, street: '501 Stanyan St', city: 'San Francisco', state: 'CA', zip: '94117', lat: 37.7694, lng: -122.4528},
+  {id: 4, street: '2 Marina Blvd', city: 'San Francisco', state: 'CA', zip: '94123', lat: 37.8066, lng: -122.4364},
+  {id: 5, street: '600 Montgomery St', city: 'San Francisco', state: 'CA', zip: '94111', lat: 37.7952, lng: -122.4028},
+  {id: 6, street: '55 Music Concourse Dr', city: 'San Francisco', state: 'CA', zip: '94118', lat: 37.7706, lng: -122.4669},
+  {id: 7, street: '1 Warriors Way', city: 'San Francisco', state: 'CA', zip: '94158', lat: 37.7680, lng: -122.3877},
+  {id: 8, street: '900 Innes Ave', city: 'San Francisco', state: 'CA', zip: '94124', lat: 37.7345, lng: -122.3720}
+];
 
 const steps = [
   {
     id: 'welcome',
     title: 'Welcome to RouteFlow',
-    body: 'Plan optimized multi-stop routes with real-time GPS navigation, smart address resolution, and 3D map views. Let’s take a quick tour of the key features.',
+    body: 'Plan optimized multi-stop routes with smart clustering, multiple travel modes, and 3D map views. We\'ve loaded sample Bay Area stops so you can explore.',
     target: null,
     position: 'center',
     icon: '\u{1F5FA}️'
@@ -12,15 +25,23 @@ const steps = [
   {
     id: 'import',
     title: 'Import Your Stops',
-    body: 'Start by adding addresses. Import from a CSV/Excel file, paste them in, or type them one at a time. Our multi-provider geocoder handles incomplete or fuzzy addresses.',
+    body: 'Add addresses by importing CSV/Excel files, pasting a list, or typing one at a time. Multi-provider geocoding handles fuzzy or incomplete addresses.',
     target: () => document.getElementById('manageStopsBtn') || document.getElementById('emptyImportBtn'),
     position: 'left',
     icon: '\u{1F4CD}'
   },
   {
+    id: 'travelmode',
+    title: 'Choose How You Travel',
+    body: 'Switch between driving, cycling, and walking. Routes are re-optimized for each mode with accurate travel times from OpenStreetMap.',
+    target: () => document.getElementById('travelModeBar'),
+    position: () => window.innerWidth < 768 ? 'top' : 'left',
+    icon: '\u{1F697}'
+  },
+  {
     id: 'cluster',
     title: 'Split Into Routes',
-    body: 'Have too many stops for one trip? Drag this slider to split your stops into multiple optimized routes using intelligent clustering.',
+    body: 'Too many stops for one trip? Drag the slider to split into multiple optimized routes using geographic clustering.',
     target: () => document.querySelector('.cluster-card'),
     position: 'bottom',
     icon: '\u{1F504}'
@@ -28,31 +49,23 @@ const steps = [
   {
     id: 'panel',
     title: 'Your Stop List',
-    body: 'All your stops appear here, ordered optimally. Tap any stop to see it on the map. Check off stops as you complete them to track progress.',
+    body: 'Stops are listed in optimized order. Tap any stop to see it on the map, or check it off as you complete it to track progress.',
     target: () => window.innerWidth < 768 ? document.getElementById('mobileNavPlan') : document.getElementById('bottomSheet'),
     position: () => window.innerWidth < 768 ? 'top' : 'left',
     icon: '\u{1F4CB}'
   },
   {
-    id: 'mapcontrols',
-    title: 'Map Controls',
-    body: 'Zoom in/out, fit all stops in view, locate yourself via GPS, toggle visited stops, or import new addresses — all from this toolbar.',
-    target: () => document.querySelector('.map-controls'),
-    position: 'left',
-    icon: '\u{1F5FA}️'
-  },
-  {
     id: 'export',
-    title: 'Navigate & Share',
-    body: 'Open your optimized route in Google Maps or Apple Maps for turn-by-turn navigation, or download as a text file to share with your team.',
+    title: 'Navigate with Google or Apple Maps',
+    body: 'Export your optimized route directly to Google Maps or Apple Maps for turn-by-turn navigation, or download as a shareable text file.',
     target: () => document.getElementById('exportBtn'),
     position: 'left',
     icon: '\u{1F4E4}'
   },
   {
     id: 'shortcuts',
-    title: 'Pro Tips',
-    body: 'Use keyboard shortcuts: H for end point, +/− for zoom, 1–9 to switch routes, Esc to close panels. Export to Google Maps or Apple Maps for turn-by-turn navigation. Works fully offline once loaded.',
+    title: 'You\'re All Set!',
+    body: 'Keyboard shortcuts: H for end point, +/− to zoom, 1–9 to switch routes, Esc to close. The app works fully offline once loaded. Enjoy!',
     target: null,
     position: 'center',
     icon: '⚡'
@@ -63,6 +76,35 @@ let currentStep = 0;
 let overlay = null;
 let tooltip = null;
 let isActive = false;
+let savedSpots = null;
+let savedVisited = null;
+
+function loadDemoData(renderFn) {
+  savedSpots = state.SPOTS.length ? [...state.SPOTS] : null;
+  savedVisited = new Set(state.visitedSet);
+  state.SPOTS = DEMO_SPOTS;
+  state.visitedSet = new Set([1, 5]);
+  state.durationMatrix = null;
+  state.currentRoutes = [];
+  state.numClusters = 1;
+  state.activeFilter = -1;
+  renderFn();
+}
+
+function restoreData(renderFn) {
+  if (savedSpots !== null) {
+    state.SPOTS = savedSpots;
+    state.visitedSet = savedVisited;
+  } else {
+    state.SPOTS = [];
+    state.visitedSet = new Set();
+  }
+  state.durationMatrix = null;
+  state.currentRoutes = [];
+  savedSpots = null;
+  savedVisited = null;
+  renderFn();
+}
 
 function createOverlay() {
   overlay = document.createElement('div');
@@ -105,6 +147,7 @@ function goBack() {
 
 function complete() {
   destroy();
+  if (savedSpots !== null && renderCallback) restoreData(renderCallback);
   try { localStorage.setItem(TOUR_KEY, '1'); } catch {}
 }
 
@@ -140,7 +183,7 @@ function showStep() {
     <div class="tour-tooltip-footer">
       <div class="tour-dots">${dots}</div>
       <div class="tour-actions">
-        ${isFirst ? `<button class="tour-btn tour-btn-skip" onclick="window._tourSkip()">Skip Tour</button>` : `<button class="tour-btn tour-btn-back" onclick="window._tourBack()">Back</button>`}
+        ${isFirst ? `<button class="tour-btn tour-btn-skip" onclick="window._tourSkip()">Skip</button>` : `<button class="tour-btn tour-btn-back" onclick="window._tourBack()">Back</button>`}
         <button class="tour-btn tour-btn-next" onclick="window._tourNext()">${isLast ? 'Get Started' : 'Next'}</button>
       </div>
     </div>
@@ -200,13 +243,18 @@ function showStep() {
 }
 
 let resizeHandler = null;
+let renderCallback = null;
 
-export function startTour() {
+export function startTour(renderFn) {
   if (isActive) return;
   isActive = true;
   currentStep = 0;
+  renderCallback = renderFn || null;
   document.body.classList.add('tour-active');
   createOverlay();
+
+  if (renderFn) loadDemoData(renderFn);
+
   showStep();
 
   window._tourNext = advance;

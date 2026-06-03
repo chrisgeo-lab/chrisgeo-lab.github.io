@@ -1,4 +1,4 @@
-import { state, STORE_V, saveSet } from './state.js';
+import { state, STORE_V, STORE_SPOTS, saveSet, saveJSON } from './state.js';
 import { toast, showError, hideError } from './utils.js';
 import { map } from './map.js';
 import { render, renderView, renderStopList, toggleVisited, exportRoute, exportToGoogleMaps, exportToAppleMaps, computeMaxClusters,
@@ -110,7 +110,7 @@ document.getElementById('toggleVisitedBtn').onclick = () => {
 // Export buttons
 document.getElementById('exportBtn').onclick = exportToGoogleMaps;
 document.getElementById('exportTxtBtn').onclick = exportRoute;
-document.getElementById('tourBtn').onclick = () => { resetTour(); startTour(); };
+document.getElementById('tourBtn').onclick = () => { resetTour(); startTour(render); };
 
 // Keyboard shortcuts
 document.addEventListener('keydown', e => {
@@ -128,7 +128,7 @@ document.addEventListener('keydown', e => {
   else if (e.key === 'E') exportRoute();
   else if (e.key === '=' || e.key === '+') map.zoomIn();
   else if (e.key === '-') map.zoomOut();
-  else if (e.key === '?') { resetTour(); startTour(); }
+  else if (e.key === '?') { resetTour(); startTour(render); }
   else if (e.key >= '1' && e.key <= '9') {
     const idx = parseInt(e.key) - 1;
     if (idx < state.currentRoutes.length) { state.activeFilter = state.activeFilter === idx ? -1 : idx; renderView(); }
@@ -266,6 +266,31 @@ document.addEventListener('touchend', () => {
   else setSheetState('peek');
 });
 
+// Travel mode toggle
+const travelModeBar = document.getElementById('travelModeBar');
+document.querySelectorAll('.travel-mode-btn').forEach(btn => {
+  btn.onclick = () => {
+    const mode = btn.dataset.mode;
+    if (mode === state.travelMode) return;
+    state.travelMode = mode;
+    saveJSON('routeflow-travel-mode', mode);
+    document.querySelectorAll('.travel-mode-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.durationMatrix = null;
+    state.osrmCache = {};
+    render();
+    const labels = {car: 'Driving', bike: 'Cycling', walk: 'Walking'};
+    toast(`Switched to ${labels[mode]} mode`);
+  };
+});
+function updateTravelModeUI() {
+  const bar = document.getElementById('travelModeBar');
+  bar.classList.toggle('show', state.SPOTS.length > 0);
+  document.querySelectorAll('.travel-mode-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.mode === state.travelMode);
+  });
+}
+
 // Service Worker
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').then(reg => {
@@ -308,12 +333,13 @@ if (navigator.geolocation) {
 }
 if (!navigator.onLine) updateOnlineStatus();
 document.getElementById('progressBar').style.width = `${state.SPOTS.length ? (state.visitedSet.size / state.SPOTS.length) * 100 : 0}%`;
+updateTravelModeUI();
 render();
 
 // Guided tour on first visit
 if (shouldShowTour()) {
-  setTimeout(startTour, 1200);
+  setTimeout(() => startTour(render), 1200);
 }
 
 // Allow re-triggering tour from console: window.resetTour()
-window.resetTour = () => { resetTour(); startTour(); };
+window.resetTour = () => { resetTour(); startTour(render); };

@@ -3,6 +3,11 @@ export const STORE_SPOTS = 'festival-spots';
 export const COLORS = ['#007AFF','#34C759','#FF9500','#AF52DE','#FF2D55','#5AC8FA','#5856D6','#FF6482'];
 export const STOP_MIN = 3;
 export const OSRM = 'https://router.project-osrm.org';
+export const OSRM_PROFILES = {
+  car: {primary: 'https://router.project-osrm.org', fallback: 'https://routing.openstreetmap.de/routed-car', service: 'driving'},
+  bike: {primary: 'https://routing.openstreetmap.de/routed-bike', fallback: null, service: 'driving'},
+  walk: {primary: 'https://routing.openstreetmap.de/routed-foot', fallback: null, service: 'driving'}
+};
 export const STORE_V = 'festival-visited';
 export const STORE_H = 'festival-home';
 export const STORE_CACHE = 'festival-osrm-cache';
@@ -54,5 +59,6 @@ export const state = {
   lastRenderError: null,
   matrixFallback: false,
   panelHidden: false,
-  sheetState: 'peek'
+  sheetState: 'peek',
+  travelMode: loadJSON('routeflow-travel-mode') || 'car'
 };

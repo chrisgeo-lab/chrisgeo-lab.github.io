@@ -1,7 +1,7 @@
-import { state, OSRM, STORE_CACHE, CACHE_MAX_ENTRIES, saveJSON } from './state.js';
+import { state, OSRM_PROFILES, STORE_CACHE, CACHE_MAX_ENTRIES, saveJSON } from './state.js';
 import { hd, showError } from './utils.js';
 
-export function cacheKey(pts) { return pts.map(p => `${p.lat.toFixed(5)},${p.lng.toFixed(5)}`).join('|'); }
+export function cacheKey(pts) { return `${state.travelMode}:${pts.map(p => `${p.lat.toFixed(5)},${p.lng.toFixed(5)}`).join('|')}`; }
 
 export function trimCache() {
   const keys = Object.keys(state.osrmCache);
@@ -11,10 +11,17 @@ export function trimCache() {
   }
 }
 
-const OSRM_SERVERS = [
-  OSRM,
-  'https://routing.openstreetmap.de/routed-car'
-];
+function getServers() {
+  const profile = OSRM_PROFILES[state.travelMode] || OSRM_PROFILES.car;
+  const servers = [profile.primary];
+  if (profile.fallback) servers.push(profile.fallback);
+  return servers;
+}
+
+function getServiceName() {
+  const profile = OSRM_PROFILES[state.travelMode] || OSRM_PROFILES.car;
+  return profile.service;
+}
 
 async function fetchWithRetry(url, retries = 2, delay = 2000, signal) {
   for (let i = 0; i <= retries; i++) {
@@ -35,19 +42,21 @@ async function fetchWithRetry(url, retries = 2, delay = 2000, signal) {
 }
 
 async function fetchFromAnyServer(path) {
-  for (const server of OSRM_SERVERS) {
+  const servers = getServers();
+  for (const server of servers) {
     try {
       const r = await fetchWithRetry(`${server}${path}`);
       return r;
     } catch (e) {
-      if (server === OSRM_SERVERS[OSRM_SERVERS.length - 1]) throw e;
+      if (server === servers[servers.length - 1]) throw e;
     }
   }
 }
 
 export async function fetchTable(pts) {
   const c = pts.map(p => `${p.lng},${p.lat}`).join(';');
-  const r = await fetchFromAnyServer(`/table/v1/driving/${c}?annotations=duration`);
+  const svc = getServiceName();
+  const r = await fetchFromAnyServer(`/table/v1/${svc}/${c}?annotations=duration`);
   const d = await r.json();
   if (d.code !== 'Ok') throw new Error(d.message || d.code);
   return d;
@@ -75,7 +84,8 @@ async function fetchTableChunked(pts) {
       const dstIndices = Array.from({length: dstLen}, (_, i) => i + srcLen);
 
       const c = allPts.map(p => `${p.lng},${p.lat}`).join(';');
-      const path = `/table/v1/driving/${c}?annotations=duration&sources=${srcIndices.join(';')}&destinations=${dstIndices.join(';')}`;
+      const svc = getServiceName();
+      const path = `/table/v1/${svc}/${c}?annotations=duration&sources=${srcIndices.join(';')}&destinations=${dstIndices.join(';')}`;
       const r = await fetchFromAnyServer(path);
       const d = await r.json();
       if (d.code !== 'Ok') throw new Error(d.message || d.code);
@@ -96,7 +106,8 @@ export async function fetchRoute(pts) {
   const key = cacheKey(pts);
   if (state.osrmCache[key]) return state.osrmCache[key];
   const c = pts.map(p => `${p.lng},${p.lat}`).join(';');
-  const r = await fetchFromAnyServer(`/route/v1/driving/${c}?overview=full&geometries=geojson&steps=true`);
+  const svc = getServiceName();
+  const r = await fetchFromAnyServer(`/route/v1/${svc}/${c}?overview=full&geometries=geojson&steps=true`);
   const d = await r.json();
   if (d.code !== 'Ok') throw new Error(d.message || d.code);
   state.osrmCache[key] = d.routes[0];
@@ -106,11 +117,13 @@ export async function fetchRoute(pts) {
 }
 
 export function buildHaversineMatrix(pts) {
+  const speeds = {car: 25, bike: 10, walk: 3};
+  const speed = speeds[state.travelMode] || 25;
   const n = pts.length;
   const m = Array.from({length: n}, () => new Array(n).fill(0));
   for (let i = 0; i < n; i++) {
     for (let j = 0; j < n; j++) {
-      if (i !== j) m[i][j] = (hd(pts[i], pts[j]) / 25) * 3600;
+      if (i !== j) m[i][j] = (hd(pts[i], pts[j]) / speed) * 3600;
     }
   }
   return m;
