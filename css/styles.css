@@ -52,6 +52,7 @@ body{
 #gpsLocBtn{font-size:16px}
 #toggleVisitedBtn{font-size:14px;opacity:.5}
 #manageStopsBtn{font-size:15px}
+#tourBtn{font-size:14px;font-weight:700;color:var(--blue)}
 
 .maplibregl-popup-content{border-radius:12px!important;box-shadow:0 4px 20px rgba(0,0,0,.15)!important;padding:0!important}
 .maplibregl-popup-tip{border-top-color:var(--card-solid)!important}
@@ -194,12 +195,8 @@ body{
   border:none;cursor:pointer;transition:all .15s;font-family:var(--font)
 }
 .nav-btn:active{transform:scale(.96)}
-.nav-btn-primary{background:rgba(255,255,255,.95);color:#007AFF}
-.nav-btn-primary:hover{background:#fff}
 .nav-btn-secondary{background:rgba(255,255,255,.2);color:#fff}
 .nav-btn-secondary:hover{background:rgba(255,255,255,.3)}
-.nav-btn-wide{flex:2}
-.nav-btn-sm{font-size:12px}
 
 /* Route filter dropdown */
 .filter-row{
@@ -335,100 +332,6 @@ body{
 .dir-step-text strong{font-weight:600}
 .dir-step-dist{font-size:11px;color:var(--secondary);margin-top:2px;font-family:var(--mono)}
 
-/* Navigation mode */
-.nav-overlay{display:none;position:fixed;inset:0;z-index:2000;pointer-events:none}
-.nav-overlay.active{display:block}
-.nav-overlay>*{pointer-events:auto}
-
-body.navigating .top-bar{display:none}
-body.navigating .bottom-sheet{display:none}
-body.navigating .map-controls{display:none}
-body.navigating .kbd-hint{display:none}
-body.navigating .fab-add-stops{display:none !important}
-
-.nav-instruction{
-  position:fixed;top:0;left:0;right:0;z-index:2001;
-  background:var(--card);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
-  padding:calc(16px + env(safe-area-inset-top)) 20px 16px;
-  box-shadow:var(--shadow-lg);
-  display:flex;align-items:center;gap:14px
-}
-.nav-maneuver-icon{
-  width:44px;height:44px;border-radius:12px;background:var(--blue);
-  display:flex;align-items:center;justify-content:center;
-  font-size:22px;color:#fff;flex-shrink:0
-}
-.nav-maneuver-info{flex:1}
-.nav-maneuver-dist{font-size:22px;font-weight:700;color:var(--text)}
-.nav-maneuver-text{font-size:14px;color:var(--secondary);margin-top:2px;line-height:1.3}
-.nav-close{
-  width:36px;height:36px;border-radius:50%;background:rgba(255,59,48,.12);
-  display:flex;align-items:center;justify-content:center;
-  font-size:18px;color:var(--red);cursor:pointer;border:none;flex-shrink:0
-}
-.nav-close:hover{background:rgba(255,59,48,.2)}
-
-/* Navigation directions panel — full screen on mobile, side panel on desktop */
-.nav-dir-panel{
-  position:fixed;top:0;right:0;bottom:0;width:360px;max-width:100vw;
-  z-index:2002;background:var(--card-solid);
-  transform:translateX(100%);transition:transform .3s cubic-bezier(.4,0,.2,1);
-  display:flex;flex-direction:column;overflow:hidden;
-  box-shadow:-4px 0 30px rgba(0,0,0,.15);border-radius:var(--radius) 0 0 var(--radius)
-}
-.nav-dir-panel.open{transform:translateX(0)}
-.nav-dir-header{
-  padding:calc(16px + env(safe-area-inset-top)) 20px 16px;display:flex;align-items:center;border-bottom:1px solid var(--separator);flex-shrink:0
-}
-.nav-dir-title{font-size:16px;font-weight:700;color:var(--text);flex:1}
-.nav-dir-close{
-  width:32px;height:32px;border-radius:50%;background:var(--fill);border:none;
-  cursor:pointer;font-size:18px;color:var(--secondary);display:flex;align-items:center;justify-content:center
-}
-.nav-dir-close:hover{background:rgba(120,120,128,.2)}
-.nav-dir-close:active{transform:scale(.9)}
-.nav-dir-content{flex:1;overflow-y:auto;padding-bottom:20px}
-
-.nav-bottom{
-  position:fixed;bottom:0;left:0;right:0;z-index:2001;
-  background:var(--card);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
-  border-radius:24px 24px 0 0;
-  padding:16px 20px calc(16px + env(safe-area-inset-bottom));
-  box-shadow:0 -4px 30px rgba(0,0,0,.12);
-  display:flex;align-items:center;gap:12px
-}
-.nav-eta{flex:1}
-.nav-eta-time{font-size:22px;font-weight:700;color:var(--text)}
-.nav-eta-detail{font-size:12px;color:var(--secondary);margin-top:2px}
-.nav-next-stop{text-align:right;flex:1;min-width:0}
-.nav-next-label{font-size:11px;color:var(--secondary);text-transform:uppercase}
-.nav-next-name{font-size:14px;font-weight:600;color:var(--text);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-@media(max-width:767px){
-  .nav-dir-panel{width:100vw;border-radius:0}
-  .nav-instruction{padding:calc(12px + env(safe-area-inset-top)) 12px 12px;gap:10px;max-width:100vw;overflow:hidden}
-  .nav-maneuver-icon{width:36px;height:36px;font-size:16px;border-radius:10px}
-  .nav-maneuver-dist{font-size:17px}
-  .nav-maneuver-text{font-size:12px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-  .nav-maneuver-info{flex:1;min-width:0;overflow:hidden}
-  .nav-close{width:30px;height:30px;font-size:14px}
-  .nav-bottom{
-    padding:10px 12px calc(10px + env(safe-area-inset-bottom));
-    gap:6px;flex-wrap:wrap;max-width:100vw;overflow:hidden
-  }
-  .nav-eta{flex:0 0 auto;max-width:40%}
-  .nav-eta-time{font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .nav-eta-detail{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .nav-next-stop{flex:1 1 0;min-width:0;text-align:right;max-width:55%;overflow:hidden}
-  .nav-next-name{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .nav-next-label{font-size:10px}
-  .nav-bottom>div:last-child{
-    flex-basis:100%;display:flex;flex-direction:row;gap:6px;margin-top:4px
-  }
-  .nav-bottom>div:last-child .nav-btn{
-    flex:1;text-align:center;padding:11px 8px;font-size:12px;
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis
-  }
-}
 
 /* GPS dot */
 .gps-dot{position:relative;width:22px;height:22px}
@@ -533,6 +436,17 @@ body.navigating .fab-add-stops{display:none !important}
 .gmaps-btn:hover{box-shadow:0 4px 16px rgba(66,133,244,.4)}
 .gmaps-btn:active{transform:scale(.97)}
 
+.apple-maps-btn{
+  width:100%;padding:14px 20px;border-radius:var(--radius-sm);
+  background:linear-gradient(135deg,#1d1d1f,#3a3a3c);color:#fff;
+  font-size:15px;font-weight:600;border:none;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  box-shadow:0 3px 12px rgba(0,0,0,.2);transition:transform .1s,box-shadow .1s;
+  font-family:var(--font)
+}
+.apple-maps-btn:hover{box-shadow:0 4px 16px rgba(0,0,0,.3)}
+.apple-maps-btn:active{transform:scale(.97)}
+
 /* Inline badge buttons */
 .badge-btn{
   background:var(--blue);color:#fff;border:none;font-size:11px;font-weight:600;
@@ -566,17 +480,6 @@ body.navigating .fab-add-stops{display:none !important}
 .section-hdr-visited{cursor:default}
 .section-hdr-visited .section-hdr-title{color:var(--secondary)}
 
-.nav-leg-hdr{
-  padding:12px 20px;background:var(--fill);font-size:12px;font-weight:600;
-  color:var(--secondary);display:flex;align-items:center;gap:8px;
-  border-bottom:1px solid var(--separator)
-}
-.nav-step{
-  padding:10px 20px;display:flex;align-items:center;gap:12px;
-  border-bottom:1px solid var(--separator)
-}
-.nav-step.active{background:rgba(0,122,255,.06)}
-.nav-step.past{opacity:.4}
 
 /* Animated route entry */
 @keyframes fadeSlideUp{
@@ -595,17 +498,6 @@ body.navigating .fab-add-stops{display:none !important}
 }
 .route-dropdown-item{position:relative}
 
-/* Recenter button */
-.recenter-btn{
-  position:fixed;bottom:220px;right:16px;z-index:2002;
-  width:44px;height:44px;border-radius:50%;background:var(--card-solid);
-  box-shadow:var(--shadow);display:none;align-items:center;justify-content:center;
-  cursor:pointer;border:none;font-size:18px;color:var(--blue);transition:transform .15s
-}
-.recenter-btn:hover{transform:scale(1.08)}
-.recenter-btn:active{transform:scale(.95)}
-.recenter-btn.show{display:flex}
-body.navigating .recenter-btn.show{bottom:130px}
 
 /* Export button */
 .export-toast{
@@ -813,7 +705,6 @@ body.navigating .recenter-btn.show{bottom:130px}
     padding:12px 10px;font-size:14px;text-align:center;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0
   }
-  .next-stop-actions .nav-btn-wide{grid-column:1 / -1}
   #gmapsExportCard{margin:0 12px 8px !important}
   .gmaps-btn{padding:14px 16px;font-size:14px}
 
@@ -852,12 +743,6 @@ body.navigating .recenter-btn.show{bottom:130px}
   }
   .modal-actions .modal-btn-danger{flex:0 1 auto}
 
-  /* Recenter button */
-  .recenter-btn{
-    bottom:calc(66px + env(safe-area-inset-bottom));
-    right:10px;width:38px;height:38px
-  }
-
   /* Toast */
   .toast{
     top:auto;bottom:calc(80px + env(safe-area-inset-bottom));
@@ -870,16 +755,8 @@ body.navigating .recenter-btn.show{bottom:130px}
   /* FAB position above nav bar */
   .fab-add-stops{bottom:calc(70px + env(safe-area-inset-bottom))}
 
-  /* Nav overlay containment */
-  .nav-overlay{overflow:hidden}
-  .nav-instruction{max-width:100vw;overflow:hidden}
-  .nav-bottom{max-width:100vw;overflow:hidden}
-
   /* Hide desktop panel toggle on mobile */
   .panel-toggle{display:none !important}
-
-  /* Hide mobile nav during navigation */
-  body.navigating .mobile-nav{display:none}
 }
 
 /* Landscape mobile */
@@ -899,9 +776,8 @@ body.navigating .recenter-btn.show{bottom:130px}
   .next-stop{margin:4px 8px;padding:8px 10px}
   .next-stop-label{font-size:9px}
   .next-stop-street{font-size:12px}
-  .next-stop-actions{grid-template-columns:1fr 1fr 1fr;gap:4px}
+  .next-stop-actions{grid-template-columns:1fr 1fr;gap:4px}
   .next-stop-actions .nav-btn{padding:6px 6px;font-size:11px}
-  .next-stop-actions .nav-btn-wide{grid-column:auto}
   .map-controls{
     top:44px;bottom:auto;right:8px;
     max-height:calc(100vh - 44px - 60px);
@@ -1081,6 +957,97 @@ body.navigating .recenter-btn.show{bottom:130px}
 }
 @keyframes geo-shimmer{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
 
+/* Guided Tour */
+.tour-overlay{
+  position:fixed;inset:0;z-index:9000;cursor:pointer
+}
+.tour-overlay-svg{
+  position:absolute;inset:0;width:100%;height:100%
+}
+.tour-cutout{transition:all .4s cubic-bezier(.4,0,.2,1)}
+
+.tour-tooltip{
+  position:fixed;z-index:9001;
+  width:320px;max-width:calc(100vw - 32px);
+  background:var(--card-solid);border-radius:var(--radius);
+  padding:24px;box-shadow:0 12px 48px rgba(0,0,0,.25),0 2px 12px rgba(0,0,0,.1);
+  opacity:0;transform:translateY(8px) scale(.96);
+  transition:opacity .3s cubic-bezier(.4,0,.2,1),transform .3s cubic-bezier(.4,0,.2,1);
+  pointer-events:auto
+}
+.tour-tooltip.visible{opacity:1;transform:translateY(0) scale(1)}
+.tour-tooltip.tour-center{
+  top:50% !important;left:50% !important;
+  transform:translate(-50%,-50%) scale(1) !important;
+  bottom:auto !important;right:auto !important
+}
+.tour-tooltip-icon{
+  font-size:28px;margin-bottom:12px;
+  width:48px;height:48px;border-radius:14px;
+  background:linear-gradient(135deg,rgba(0,122,255,.1),rgba(88,86,214,.1));
+  display:flex;align-items:center;justify-content:center
+}
+.tour-tooltip-title{
+  font-size:17px;font-weight:700;color:var(--text);margin-bottom:8px;
+  letter-spacing:-.2px
+}
+.tour-tooltip-body{
+  font-size:14px;color:var(--secondary);line-height:1.55;margin-bottom:20px
+}
+.tour-tooltip-footer{
+  display:flex;align-items:center;justify-content:space-between;gap:12px
+}
+.tour-dots{display:flex;gap:5px;align-items:center}
+.tour-dot{
+  width:6px;height:6px;border-radius:50%;background:var(--tertiary);
+  transition:all .25s
+}
+.tour-dot.active{
+  width:18px;border-radius:3px;background:var(--blue)
+}
+.tour-actions{display:flex;gap:8px}
+.tour-btn{
+  padding:9px 16px;border-radius:var(--radius-xs);font-size:13px;font-weight:600;
+  border:none;cursor:pointer;font-family:var(--font);transition:all .15s;
+  white-space:nowrap
+}
+.tour-btn:active{transform:scale(.95)}
+.tour-btn-next{background:var(--blue);color:#fff}
+.tour-btn-next:hover{background:#0066d6}
+.tour-btn-back{background:var(--fill);color:var(--text)}
+.tour-btn-back:hover{background:rgba(120,120,128,.18)}
+.tour-btn-skip{background:none;color:var(--secondary);padding:9px 10px}
+.tour-btn-skip:hover{color:var(--text)}
+.tour-step-count{
+  position:absolute;top:12px;right:16px;
+  font-size:11px;color:var(--tertiary);font-weight:500
+}
+body.tour-active .bottom-sheet,
+body.tour-active .top-bar,
+body.tour-active .map-controls,
+body.tour-active .fab-add-stops{
+  pointer-events:none
+}
+
+@media(max-width:767px){
+  .tour-tooltip{
+    width:calc(100vw - 32px);max-width:360px;padding:20px;
+    position:fixed !important;
+    bottom:24px !important;top:auto !important;
+    left:50% !important;right:auto !important;
+    transform:translateX(-50%) translateY(8px) scale(.96) !important
+  }
+  .tour-tooltip.visible{
+    transform:translateX(-50%) translateY(0) scale(1) !important
+  }
+  .tour-tooltip.tour-center{
+    top:auto !important;bottom:24px !important;
+    transform:translateX(-50%) translateY(0) scale(1) !important
+  }
+  .tour-tooltip-title{font-size:16px}
+  .tour-tooltip-body{font-size:13px;margin-bottom:16px}
+  .tour-tooltip-icon{width:40px;height:40px;font-size:22px;border-radius:10px;margin-bottom:10px}
+}
 
 @media(max-width:767px){
   .addr-modal{
