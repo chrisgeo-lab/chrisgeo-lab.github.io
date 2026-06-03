@@ -57,9 +57,17 @@ body{
 #manageStopsBtn{font-size:15px}
 #tourBtn{font-size:14px;font-weight:700;color:var(--blue)}
 
-.maplibregl-popup-content{border-radius:14px!important;box-shadow:0 8px 32px rgba(0,0,0,.15)!important;padding:0!important}
+.maplibregl-popup-content{
+  border-radius:14px!important;box-shadow:0 8px 32px rgba(0,0,0,.15)!important;padding:0!important;
+  background:var(--card-solid)!important;color:var(--text)!important
+}
 .maplibregl-popup-tip{border-top-color:var(--card-solid)!important}
+.maplibregl-popup-anchor-bottom .maplibregl-popup-tip{border-top-color:var(--card-solid)!important;border-bottom-color:transparent!important}
+.maplibregl-popup-anchor-top .maplibregl-popup-tip{border-bottom-color:var(--card-solid)!important;border-top-color:transparent!important}
+.maplibregl-popup-anchor-left .maplibregl-popup-tip{border-right-color:var(--card-solid)!important;border-left-color:transparent!important}
+.maplibregl-popup-anchor-right .maplibregl-popup-tip{border-left-color:var(--card-solid)!important;border-right-color:transparent!important}
 .maplibregl-popup-close-button{font-size:18px;padding:4px 8px;color:var(--secondary)}
+.maplibregl-popup-close-button:hover{color:var(--text);background:var(--fill);border-radius:50%}
 .stop-popup{padding:14px 16px;font-family:var(--font)}
 .stop-popup-label{font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase}
 .stop-popup-street{font-size:15px;font-weight:700;margin-top:4px;color:var(--text);letter-spacing:-.01em}
