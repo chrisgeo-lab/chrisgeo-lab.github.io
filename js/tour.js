@@ -11,67 +11,99 @@ const DEMO_SPOTS = [
   {id: 5, street: '600 Montgomery St', city: 'San Francisco', state: 'CA', zip: '94111', lat: 37.7952, lng: -122.4028},
   {id: 6, street: '55 Music Concourse Dr', city: 'San Francisco', state: 'CA', zip: '94118', lat: 37.7706, lng: -122.4669},
   {id: 7, street: '1 Warriors Way', city: 'San Francisco', state: 'CA', zip: '94158', lat: 37.7680, lng: -122.3877},
-  {id: 8, street: '900 Innes Ave', city: 'San Francisco', state: 'CA', zip: '94124', lat: 37.7345, lng: -122.3720}
+  {id: 8, street: '900 Innes Ave', city: 'San Francisco', state: 'CA', zip: '94124', lat: 37.7345, lng: -122.3720},
+  {id: 9, street: '2801 Leavenworth St', city: 'San Francisco', state: 'CA', zip: '94133', lat: 37.8070, lng: -122.4187},
+  {id: 10, street: '1 Sausalito Blvd', city: 'Sausalito', state: 'CA', zip: '94965', lat: 37.8590, lng: -122.4852},
+  {id: 11, street: '100 Shoreline Hwy', city: 'Mill Valley', state: 'CA', zip: '94941', lat: 37.8830, lng: -122.5270},
+  {id: 12, street: '501 Sir Francis Drake', city: 'San Anselmo', state: 'CA', zip: '94960', lat: 37.9746, lng: -122.5615},
+  {id: 13, street: '800 Point San Pedro Rd', city: 'San Rafael', state: 'CA', zip: '94901', lat: 37.9952, lng: -122.4530},
+  {id: 14, street: '2000 Larkspur Landing', city: 'Larkspur', state: 'CA', zip: '94939', lat: 37.9455, lng: -122.5090},
+  {id: 15, street: '400 Oyster Point Blvd', city: 'South San Francisco', state: 'CA', zip: '94080', lat: 37.6640, lng: -122.3975},
+  {id: 16, street: '1600 Bayshore Hwy', city: 'Burlingame', state: 'CA', zip: '94010', lat: 37.5930, lng: -122.3620},
+  {id: 17, street: '250 Hamilton Ave', city: 'Palo Alto', state: 'CA', zip: '94301', lat: 37.4430, lng: -122.1610},
+  {id: 18, street: '100 El Camino Real', city: 'Redwood City', state: 'CA', zip: '94063', lat: 37.4860, lng: -122.2280},
+  {id: 19, street: '3251 Hanover St', city: 'Palo Alto', state: 'CA', zip: '94304', lat: 37.4170, lng: -122.1450},
+  {id: 20, street: '1 Hacker Way', city: 'Menlo Park', state: 'CA', zip: '94025', lat: 37.4845, lng: -122.1477},
+  {id: 21, street: '1600 Amphitheatre Pkwy', city: 'Mountain View', state: 'CA', zip: '94043', lat: 37.4220, lng: -122.0841},
+  {id: 22, street: '1 Infinite Loop', city: 'Cupertino', state: 'CA', zip: '95014', lat: 37.3318, lng: -122.0312},
+  {id: 23, street: '2855 Stevens Creek Blvd', city: 'Santa Clara', state: 'CA', zip: '95050', lat: 37.3240, lng: -121.9490},
+  {id: 24, street: '200 Santa Row', city: 'San Jose', state: 'CA', zip: '95128', lat: 37.3210, lng: -121.9470},
+  {id: 25, street: '750 The Alameda', city: 'San Jose', state: 'CA', zip: '95126', lat: 37.3330, lng: -121.9060},
+  {id: 26, street: '5401 Bay St', city: 'Emeryville', state: 'CA', zip: '94608', lat: 37.8390, lng: -122.2960},
+  {id: 27, street: '1 Telegraph Ave', city: 'Oakland', state: 'CA', zip: '94612', lat: 37.8115, lng: -122.2730},
+  {id: 28, street: '6000 Shellmound St', city: 'Emeryville', state: 'CA', zip: '94608', lat: 37.8460, lng: -122.2930},
+  {id: 29, street: '1955 Broadway', city: 'Oakland', state: 'CA', zip: '94612', lat: 37.8120, lng: -122.2660},
+  {id: 30, street: '51 Moraga Way', city: 'Orinda', state: 'CA', zip: '94563', lat: 37.8780, lng: -122.1800}
 ];
 
 const steps = [
   {
     id: 'welcome',
     title: 'Welcome to RouteFlow',
-    body: 'Build multi-stop routes. Split them into groups, pick your travel mode, and go.',
+    body: 'RouteFlow optimizes multi-stop routes for deliveries, sales visits, or errands. Let\'s walk through the key features.',
+    target: null,
+    position: 'center'
+  },
+  {
+    id: 'map',
+    title: 'Your Route Map',
+    body: 'Stops appear as numbered pins connected by route lines. You can zoom, pan, and click any stop for details — try it now!',
     target: null,
     position: 'center'
   },
   {
     id: 'import',
-    title: 'Import Your Stops',
-    body: 'Add addresses from a file, paste them, or type them in. Partial addresses work too.',
+    title: 'Add Your Stops',
+    body: 'Import addresses from a spreadsheet, paste a list, or type them one by one. RouteFlow automatically geocodes and plots them.',
     target: () => document.getElementById('manageStopsBtn') || document.getElementById('emptyImportBtn'),
     position: 'left'
   },
   {
     id: 'travelmode',
-    title: 'Travel Mode',
-    body: 'Pick driving, biking, or walking. Times and distances update automatically.',
+    title: 'Choose Travel Mode',
+    body: 'Switch between driving, biking, or walking. Route times and distances recalculate instantly for each mode.',
     target: () => document.getElementById('travelModeBar'),
     position: () => window.innerWidth < 768 ? 'top' : 'left'
   },
   {
     id: 'cluster',
-    title: 'Split Into Routes',
-    body: 'Drag the slider to split stops into separate routes by area.',
+    title: 'Split Into Multiple Routes',
+    body: 'Drag the slider to split your stops into color-coded route clusters by area. The demo has 30 stops split into 3 routes — try adjusting it!',
     target: () => document.querySelector('.cluster-card'),
     position: 'bottom'
   },
   {
     id: 'panel',
-    title: 'Your Stop List',
-    body: 'Listed in route order. Tap to see on map, check off when done.',
+    title: 'Stop List & Progress',
+    body: 'Your stops are listed in optimized order. Tap the circle to mark a stop complete. Use the search bar to find specific addresses.',
     target: () => window.innerWidth < 768 ? document.getElementById('mobileNavPlan') : document.getElementById('bottomSheet'),
     position: () => window.innerWidth < 768 ? 'top' : 'left'
   },
   {
     id: 'navigate',
-    title: 'Navigate',
-    body: 'Send your route to Google Maps or Apple Maps for directions.',
+    title: 'Export & Navigate',
+    body: 'Send your optimized route to Google Maps or Apple Maps for turn-by-turn navigation with one tap.',
     target: () => document.getElementById('gmapsExportCard') || document.getElementById('gmapsFullRouteBtn'),
     position: () => window.innerWidth < 768 ? 'top' : 'left'
   },
   {
     id: 'done',
-    title: 'You\'re Set',
-    body: 'Shortcuts: H = end point, +/− = zoom, 1–9 = switch routes, ? = replay tour.',
+    title: 'You\'re All Set!',
+    body: 'Keyboard shortcuts: H = set end point, +/− = zoom, 1–9 = switch routes, ? = replay this tour anytime. The demo data will clear when you close this.',
     target: null,
     position: 'center'
   }
 ];
 
 let currentStep = 0;
-let overlay = null;
 let tooltip = null;
+let highlightedEl = null;
 let isActive = false;
 let savedSpots = null;
 let savedVisited = null;
+let savedNumClusters = 1;
+let savedStartPoint = null;
+let savedHome = null;
 let resizeHandler = null;
 let keyHandler = null;
 let renderCallback = null;
@@ -79,16 +111,25 @@ let renderCallback = null;
 function loadDemoData(renderFn) {
   savedSpots = state.SPOTS.length ? [...state.SPOTS] : null;
   savedVisited = new Set(state.visitedSet);
-  state.SPOTS = DEMO_SPOTS;
-  state.visitedSet = new Set([1, 5]);
+  savedNumClusters = state.numClusters;
+  savedStartPoint = state.startPoint;
+  savedHome = state.home;
+  state.SPOTS = DEMO_SPOTS.map(s => ({...s}));
+  state.visitedSet = new Set([1, 5, 9, 15, 22]);
+  state.startPoint = {lat: DEMO_SPOTS[0].lat, lng: DEMO_SPOTS[0].lng, label: DEMO_SPOTS[0].street};
+  state.home = {lat: DEMO_SPOTS[29].lat, lng: DEMO_SPOTS[29].lng, label: DEMO_SPOTS[29].street};
   state.durationMatrix = null;
   state.currentRoutes = [];
-  state.numClusters = 1;
+  state.numClusters = 3;
   state.activeFilter = -1;
+  const slider = document.getElementById('clusterSlider');
+  if (slider) { slider.max = 10; slider.value = 3; }
+  const sliderVal = document.getElementById('clusterVal');
+  if (sliderVal) sliderVal.textContent = '3';
   renderFn();
   setTimeout(() => {
     fitBounds(DEMO_SPOTS.map(s => [s.lat, s.lng]), {padding: [80, 80]});
-  }, 100);
+  }, 400);
 }
 
 function restoreData(renderFn) {
@@ -101,39 +142,33 @@ function restoreData(renderFn) {
   }
   state.durationMatrix = null;
   state.currentRoutes = [];
+  state.numClusters = savedNumClusters;
+  state.startPoint = savedStartPoint;
+  state.home = savedHome;
+  const slider = document.getElementById('clusterSlider');
+  if (slider) { slider.value = savedNumClusters; }
+  const sliderVal = document.getElementById('clusterVal');
+  if (sliderVal) sliderVal.textContent = String(savedNumClusters);
   savedSpots = null;
   savedVisited = null;
+  savedStartPoint = null;
+  savedHome = null;
   renderFn();
 }
 
-function createOverlay() {
-  overlay = document.createElement('div');
-  overlay.className = 'tour-overlay';
-  overlay.innerHTML = `<svg class="tour-overlay-svg" width="100%" height="100%">
-    <defs><mask id="tour-mask">
-      <rect x="0" y="0" width="100%" height="100%" fill="white"/>
-      <rect class="tour-cutout" rx="12" ry="12" fill="black"/>
-    </mask></defs>
-    <rect x="0" y="0" width="100%" height="100%" fill="rgba(0,0,0,0.55)" mask="url(#tour-mask)"/>
-  </svg>`;
-  document.body.appendChild(overlay);
-
-  tooltip = document.createElement('div');
-  tooltip.className = 'tour-tooltip';
-  document.body.appendChild(tooltip);
-
-  overlay.addEventListener('click', e => {
-    if (e.target === overlay || e.target.closest('.tour-overlay-svg')) advance();
-  });
+function clearHighlight() {
+  if (highlightedEl) {
+    highlightedEl.classList.remove('tour-highlight');
+    highlightedEl = null;
+  }
 }
 
 function destroy() {
-  if (overlay) { overlay.remove(); overlay = null; }
+  clearHighlight();
   if (tooltip) { tooltip.remove(); tooltip = null; }
   if (resizeHandler) { window.removeEventListener('resize', resizeHandler); resizeHandler = null; }
   if (keyHandler) { document.removeEventListener('keydown', keyHandler); keyHandler = null; }
   isActive = false;
-  document.body.classList.remove('tour-active');
 }
 
 function advance() {
@@ -163,7 +198,7 @@ function positionTooltip(target, position) {
   const margin = 16;
   tooltip.style.width = tw + 'px';
 
-  if (!target || !target.offsetParent) {
+  if (!target || position === 'center') {
     tooltip.classList.add('tour-center');
     tooltip.style.top = '';
     tooltip.style.left = '';
@@ -176,7 +211,7 @@ function positionTooltip(target, position) {
   const rect = target.getBoundingClientRect();
   const th = tooltip.offsetHeight || 200;
 
-  let top = '', left = '', bottom = '';
+  let top = '', left = '';
 
   switch (position) {
     case 'left': {
@@ -224,18 +259,11 @@ function showStep() {
   const step = steps[currentStep];
   const target = step.target ? step.target() : null;
   const position = typeof step.position === 'function' ? step.position() : step.position;
-  const cutout = overlay.querySelector('.tour-cutout');
 
+  clearHighlight();
   if (target && target.offsetParent !== null) {
-    const rect = target.getBoundingClientRect();
-    const pad = 8;
-    cutout.setAttribute('x', rect.left - pad);
-    cutout.setAttribute('y', rect.top - pad);
-    cutout.setAttribute('width', rect.width + pad * 2);
-    cutout.setAttribute('height', rect.height + pad * 2);
-    cutout.style.display = '';
-  } else {
-    cutout.style.display = 'none';
+    target.classList.add('tour-highlight');
+    highlightedEl = target;
   }
 
   const isFirst = currentStep === 0;
@@ -249,8 +277,8 @@ function showStep() {
     <div class="tour-tooltip-footer">
       <div class="tour-step-count">${currentStep + 1} / ${steps.length}</div>
       <div class="tour-actions">
-        ${isFirst ? `<button class="tour-btn tour-btn-skip">Skip</button>` : `<button class="tour-btn tour-btn-back">Back</button>`}
-        <button class="tour-btn tour-btn-next">${isLast ? 'Done' : 'Next'}</button>
+        ${isFirst ? `<button class="tour-btn tour-btn-skip">Skip Tour</button>` : `<button class="tour-btn tour-btn-back">&larr; Back</button>`}
+        <button class="tour-btn tour-btn-next">${isLast ? 'Finish' : 'Next &rarr;'}</button>
       </div>
     </div>`;
 
@@ -270,12 +298,17 @@ export function startTour(renderFn) {
   isActive = true;
   currentStep = 0;
   renderCallback = renderFn || null;
-  document.body.classList.add('tour-active');
-  createOverlay();
 
-  if (renderFn) loadDemoData(renderFn);
+  tooltip = document.createElement('div');
+  tooltip.className = 'tour-tooltip';
+  document.body.appendChild(tooltip);
 
-  showStep();
+  if (renderFn) {
+    loadDemoData(renderFn);
+    setTimeout(() => showStep(), 800);
+  } else {
+    showStep();
+  }
 
   keyHandler = (e) => {
     if (!isActive) return;

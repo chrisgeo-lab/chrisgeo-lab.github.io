@@ -14,16 +14,21 @@ export const map = new maplibregl.Map({
   pitch: 0,
   bearing: 0,
   attributionControl: false,
-  maxZoom: 19,
+  maxZoom: 18,
   dragPan: true,
   dragRotate: false,
   scrollZoom: true,
   touchZoomRotate: true,
   doubleClickZoom: true,
-  touchPitch: false
+  touchPitch: false,
+  keyboard: true,
+  cooperativeGestures: false
 });
 
-map.addControl(new maplibregl.AttributionControl({compact: true}), 'bottom-left');
+export const mapReady = new Promise(resolve => {
+  if (map.isStyleLoaded()) resolve();
+  else map.once('load', resolve);
+});
 
 darkQuery.addEventListener('change', e => {
   map.setStyle(getStyle(e.matches));
@@ -79,15 +84,13 @@ export function clearMap() {
   markers = [];
   popups.forEach(p => p.remove());
   popups = [];
-  if (map.isStyleLoaded()) {
-    routeSources.forEach(id => {
-      try {
-        if (map.getLayer(id + '-outline')) map.removeLayer(id + '-outline');
-        if (map.getLayer(id)) map.removeLayer(id);
-        if (map.getSource(id)) map.removeSource(id);
-      } catch {}
-    });
-  }
+  routeSources.forEach(id => {
+    try {
+      if (map.getLayer(id + '-outline')) map.removeLayer(id + '-outline');
+      if (map.getLayer(id)) map.removeLayer(id);
+      if (map.getSource(id)) map.removeSource(id);
+    } catch {}
+  });
   routeSources = [];
   routeData = [];
 }
@@ -123,17 +126,16 @@ export function addPolyline(coords, color, weight = 5) {
   };
 
   routeData.push({id, geojson, color, weight});
-  if (!map.isStyleLoaded()) {
-    map.once('style.load', () => addRouteLayer(id, geojson, color, weight));
-  } else {
-    addRouteLayer(id, geojson, color, weight);
-  }
   routeSources.push(id);
+  mapReady.then(() => {
+    try { addRouteLayer(id, geojson, color, weight); } catch(e) { console.warn('Route layer failed:', e); }
+  });
   return id;
 }
 
 function addRouteLayer(id, geojson, color, weight) {
-  map.addSource(id, {type: 'geojson', data: geojson, lineMetrics: true});
+  if (map.getSource(id)) return;
+  map.addSource(id, {type: 'geojson', data: geojson});
 
   map.addLayer({
     id: id + '-outline',
@@ -142,7 +144,7 @@ function addRouteLayer(id, geojson, color, weight) {
     paint: {
       'line-color': '#000',
       'line-width': weight + 3,
-      'line-opacity': 0.1
+      'line-opacity': 0.15
     },
     layout: {'line-cap': 'round', 'line-join': 'round'}
   });
@@ -154,29 +156,10 @@ function addRouteLayer(id, geojson, color, weight) {
     paint: {
       'line-color': color,
       'line-width': weight,
-      'line-opacity': 0.85,
-      'line-gradient': [
-        'interpolate', ['linear'], ['line-progress'],
-        0, color,
-        1, lightenColor(color, 0.5)
-      ]
+      'line-opacity': 0.9
     },
     layout: {'line-cap': 'round', 'line-join': 'round'}
   });
-}
-
-function lightenColor(hex, factor) {
-  const rgb = hexToRgb(hex);
-  const r = Math.min(255, Math.round(rgb.r + (255 - rgb.r) * factor));
-  const g = Math.min(255, Math.round(rgb.g + (255 - rgb.g) * factor));
-  const b = Math.min(255, Math.round(rgb.b + (255 - rgb.b) * factor));
-  return `rgb(${r},${g},${b})`;
-}
-
-function hexToRgb(hex) {
-  hex = hex.replace('#', '');
-  if (hex.length === 3) hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
-  return {r: parseInt(hex.slice(0, 2), 16), g: parseInt(hex.slice(2, 4), 16), b: parseInt(hex.slice(4, 6), 16)};
 }
 
 export function stopIcon(n, color, vis, curr) {
@@ -197,10 +180,11 @@ export function gpsIcon() {
 
 export function setView(latlng, zoom, opts) {
   const center = Array.isArray(latlng) ? [latlng[1], latlng[0]] : [latlng.lng, latlng.lat];
+  map.stop();
   if (opts && opts.animate === false) {
     map.jumpTo({center, zoom});
   } else {
-    map.flyTo({center, zoom, duration: opts?.duration ? opts.duration * 1000 : 1000});
+    map.easeTo({center, zoom, duration: opts?.duration ? opts.duration * 1000 : 800});
   }
 }
 
@@ -217,13 +201,15 @@ export function fitBounds(bounds, opts) {
       if (opts.paddingTopLeft) { padding.left = opts.paddingTopLeft[0]; padding.top = opts.paddingTopLeft[1]; }
       if (opts.paddingBottomRight) { padding.right = opts.paddingBottomRight[0]; padding.bottom = opts.paddingBottomRight[1]; }
     }
-    map.fitBounds(lngLatBounds, {padding, duration: 1000});
+    map.stop();
+    map.fitBounds(lngLatBounds, {padding, duration: 800});
   } else {
+    map.stop();
     map.fitBounds(bounds, opts);
   }
 }
 
-export function zoomIn() { map.zoomTo(map.getZoom() + 1, {duration: 300}); }
-export function zoomOut() { map.zoomTo(map.getZoom() - 1, {duration: 300}); }
+export function zoomIn() { map.stop(); map.zoomTo(map.getZoom() + 1, {duration: 200}); }
+export function zoomOut() { map.stop(); map.zoomTo(map.getZoom() - 1, {duration: 200}); }
 export function closePopup() { popups.forEach(p => p.remove()); popups = []; }
 export function trackPopup(popup) { popups.push(popup); }

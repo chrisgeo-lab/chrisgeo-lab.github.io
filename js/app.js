@@ -1,12 +1,21 @@
 import { state, STORE_V, saveSet, saveJSON } from './state.js';
 import { toast, showError, hideError } from './utils.js';
-import { setView, zoomIn, zoomOut } from './map.js';
+import { setView, zoomIn, zoomOut, mapReady } from './map.js';
 import { render, renderView, renderStopList, toggleVisited, computeMaxClusters,
   setSheetState, toggleRouteDropdown, closeRouteDropdown } from './ui.js';
 import { exportRoute, exportToGoogleMaps, exportToAppleMaps } from './exports.js';
 import { showHomeModal, hideHomeModal, confirmHome, showStartModal, hideStartModal, confirmStart } from './modals.js';
 import { showAddrModal, hideAddrModal, resetToDefaultStops, setupAutocomplete, parsePastedText, addManualAddress, confirmAddresses, initAddressUI, setImportMode } from './addresses.js';
 import { startTour, shouldShowTour, resetTour, dismissTour, isTourActive } from './tour.js';
+
+// Dismiss loading screen once map tiles are ready
+mapReady.then(() => {
+  const loader = document.getElementById('appLoading');
+  if (loader) {
+    loader.classList.add('hidden');
+    setTimeout(() => loader.remove(), 500);
+  }
+});
 
 // Mobile view helpers
 function isMobile() { return window.innerWidth < 768; }
@@ -321,22 +330,11 @@ document.getElementById('progressBar').style.width = `${state.SPOTS.length ? (st
 updateTravelModeUI();
 render();
 
-// Guided tour on first visit - show prompt instead of auto-starting
+// Guided tour on first visit - auto-start
 if (shouldShowTour()) {
   setTimeout(() => {
-    const msg = document.getElementById('toast');
-    msg.textContent = '';
-    const txt = document.createTextNode('New here? ');
-    const btn = document.createElement('button');
-    btn.className = 'toast-undo';
-    btn.textContent = 'Take a Tour';
-    btn.onclick = () => { window.resetTour(); msg.classList.remove('show'); };
-    msg.appendChild(txt);
-    msg.appendChild(btn);
-    msg.classList.add('show');
-    setTimeout(() => msg.classList.remove('show'), 8000);
-    try { localStorage.setItem('routeflow-tour-complete', '1'); } catch {}
-  }, 1500);
+    startTour(render);
+  }, 1200);
 }
 
 // Allow re-triggering tour from console: window.resetTour()
