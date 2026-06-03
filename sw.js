@@ -1,4 +1,4 @@
-const CACHE_NAME = 'routeflow-v13';
+const CACHE_NAME = 'routeflow-v14';
 const STATIC_ASSETS = [
   './',
   './index.html',
