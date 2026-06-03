@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "RouteFlow - Multi-Stop Route Planner",
+  "name": "RouteFlow",
   "short_name": "RouteFlow",
-  "description": "Plan and optimize multi-stop routes with clustering, turn-by-turn navigation, and offline support.",
+  "description": "Plan multi-stop routes with automatic ordering, route splitting, and turn-by-turn export.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

@@ -8,11 +8,12 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
-<meta name="description" content="Plan and optimize multi-stop routes with clustering, turn-by-turn navigation, and offline support.">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://unpkg.com; style-src 'self' 'unsafe-inline' https://unpkg.com; img-src 'self' data: blob: https://*.cartocdn.com https://basemaps.cartocdn.com; connect-src 'self' https://router.project-osrm.org https://routing.openstreetmap.de https://nominatim.openstreetmap.org https://photon.komoot.io https://geocoding.geo.census.gov https://*.cartocdn.com https://basemaps.cartocdn.com; worker-src 'self' blob:; font-src 'self' data:">
+<meta name="description" content="Plan multi-stop routes with automatic ordering, route splitting, and turn-by-turn export.">
 <meta property="og:title" content="RouteFlow - Multi-Stop Route Planner">
-<meta property="og:description" content="Plan and optimize multi-stop routes with clustering, turn-by-turn navigation, and offline support.">
+<meta property="og:description" content="Plan multi-stop routes with automatic ordering, route splitting, and turn-by-turn export.">
 <meta property="og:type" content="website">
-<title>RouteFlow - Multi-Stop Route Planner</title>
+<title>RouteFlow</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%23007AFF'/><circle cx='16' cy='14' r='6' fill='white'/><path d='M16 20 L10 28 L22 28 Z' fill='white'/></svg>">
 <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect width='180' height='180' rx='40' fill='%23007AFF'/><path d='M90 30 L130 75 L110 75 L110 140 L70 140 L70 75 L50 75 Z' fill='white' opacity='0.9'/><circle cx='90' cy='105' r='12' fill='%23007AFF'/></svg>">
@@ -40,7 +41,7 @@
   <button class="map-ctrl-btn" id="tourBtn" title="Show tour" aria-label="Show guided tour">?</button>
 </div>
 
-<div class="kbd-hint">Esc: Close &middot; H: End Point &middot; +/-: Zoom &middot; 1-9: Route &middot; ?: Tour</div>
+<div class="kbd-hint">Esc: close &middot; H: end point &middot; +/-: zoom &middot; 1-9: route &middot; ?: tour</div>
 
 <!-- Top bar -->
 <div class="top-bar">
@@ -133,8 +134,8 @@
     <div class="stops-view active" id="stopsView"></div>
     <div class="empty-state" id="emptyState" style="display:none">
       <div class="empty-state-icon">&#128205;</div>
-      <div class="empty-state-title">Welcome to RouteFlow</div>
-      <div class="empty-state-text">Add your stops to plan an optimized route.<br>Import a spreadsheet or type addresses manually.</div>
+      <div class="empty-state-title">No stops yet</div>
+      <div class="empty-state-text">Import a spreadsheet or add addresses to get started.</div>
       <button id="emptyImportBtn" class="empty-state-btn">&#43; Add Stops</button>
     </div>
   </div>
@@ -159,13 +160,13 @@
 <div class="modal-overlay" id="homeModal" role="dialog" aria-modal="true" aria-labelledby="homeModalTitle">
   <div class="modal">
     <h3 id="homeModalTitle">Set End Point</h3>
-    <p>Enter where you'd like to return after completing stops. Leave blank to end at the last stop (no loop).</p>
+    <p>Where should your route end? Leave blank to finish at the last stop.</p>
     <div class="addr-autocomplete">
       <input type="text" class="modal-input" id="homeInput" placeholder="e.g. 123 Main St, Boston, MA" autocomplete="off">
       <div class="addr-ac-list" id="homeAcList"></div>
     </div>
     <div style="font-size:11px;color:var(--secondary);margin-top:8px;display:flex;align-items:center;gap:6px">
-      <span style="color:var(--blue)">&#9432;</span> Route loops back here after all stops
+      <span style="color:var(--blue)">&#9432;</span> Route will loop back here after all stops
     </div>
     <div class="modal-actions">
       <button class="modal-btn modal-btn-danger" id="homeClearBtn" style="display:none">Remove End</button>
@@ -180,13 +181,13 @@
 <div class="modal-overlay" id="startModal" role="dialog" aria-modal="true" aria-labelledby="startModalTitle">
   <div class="modal">
     <h3 id="startModalTitle">Set Start Point</h3>
-    <p>By default, your current GPS location is used. Enter an address to override, or leave blank for GPS.</p>
+    <p>By default, your GPS location is used. Enter an address to start from somewhere else.</p>
     <div class="addr-autocomplete">
       <input type="text" class="modal-input" id="startInput" placeholder="Leave blank for GPS (default)" autocomplete="off">
       <div class="addr-ac-list" id="startAcList"></div>
     </div>
     <div style="font-size:11px;color:var(--secondary);margin-top:8px;display:flex;align-items:center;gap:6px">
-      <span style="color:var(--blue)">&#9432;</span> Routes are optimized starting from this location
+      <span style="color:var(--blue)">&#9432;</span> Route order is optimized from this point
     </div>
     <div class="modal-actions">
       <button class="modal-btn modal-btn-danger" id="startClearBtn" style="display:none">Use GPS</button>
@@ -201,7 +202,7 @@
 <div class="modal-overlay" id="fixAddrModal" style="z-index:3500" role="dialog" aria-modal="true" aria-labelledby="fixAddrTitle">
   <div class="modal" style="max-width:440px">
     <h3 id="fixAddrTitle">Address not found</h3>
-    <p id="fixAddrDesc">We couldn't locate this address. Edit it below to retry, or skip/remove it.</p>
+    <p id="fixAddrDesc">Couldn't find this address. Edit below to retry, or skip it.</p>
     <div class="addr-autocomplete">
       <input type="text" class="modal-input" id="fixAddrInput" placeholder="Edit address..." autocomplete="off">
       <div class="addr-ac-list" id="fixAddrAcList"></div>
@@ -223,7 +224,7 @@
         <h3 id="addrModalTitle">Manage Stops</h3>
         <button class="addr-close-btn" id="addrCloseBtnX" aria-label="Close">&times;</button>
       </div>
-      <p>Import addresses from a file, paste them in, or add one at a time.</p>
+      <p>Import from a file, paste a list, or add one by one.</p>
     </div>
     <div class="addr-tabs">
       <button class="addr-tab active" data-tab="import">
@@ -249,13 +250,13 @@
         <input type="file" class="addr-file-input" id="addrFileInput" accept=".csv,.xlsx,.xls,.tsv,.txt">
         <div class="addr-help-card">
           <div class="addr-help-title">Expected format</div>
-          <div class="addr-help-text">Columns: street, city, state &mdash; optional: zip, lat, lng<br>First row should be headers.</div>
+          <div class="addr-help-text">Columns: street, city, state (optional: zip, lat, lng). First row = headers.</div>
         </div>
       </div>
       <div class="addr-section" id="addrPasteSection">
         <textarea class="addr-paste-area" id="addrPasteArea" placeholder="Paste addresses, one per line&#10;&#10;Examples:&#10;  123 Main St, Boston, MA 02101&#10;  456 Oak Ave, Cambridge, MA"></textarea>
         <div class="addr-help-card">
-          <div class="addr-help-text">One address per line. State is required. Commas, tabs, or pipes as delimiters.</div>
+          <div class="addr-help-text">One address per line. Include the state. Commas, tabs, or pipes all work.</div>
         </div>
         <button class="addr-action-btn" id="addrParseBtn">Parse Addresses</button>
       </div>
@@ -282,7 +283,7 @@
         </div>
         <button class="addr-action-btn" id="addrManualAddBtn">Add Stop</button>
         <div class="addr-help-card">
-          <div class="addr-help-text">Search above for suggestions, or fill in fields manually.</div>
+          <div class="addr-help-text">Search for an address or type it in below.</div>
         </div>
       </div>
       <div class="addr-preview" id="addrPreview" style="display:none"></div>
@@ -311,12 +312,13 @@
   </div>
 </div>
 
+<script src="js/fallback.js"></script>
 <script type="module" src="js/app.js"></script>
 <noscript>
   <div style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:system-ui,sans-serif;text-align:center;padding:2rem">
     <div>
-      <h1 style="font-size:1.5rem;margin-bottom:0.5rem">RouteFlow requires JavaScript</h1>
-      <p style="color:#6e6e73">Please enable JavaScript in your browser settings to use this application.</p>
+      <h1 style="font-size:1.5rem;margin-bottom:0.5rem">JavaScript Required</h1>
+      <p style="color:#6e6e73">Enable JavaScript to use RouteFlow.</p>
     </div>
   </div>
 </noscript>
