@@ -1,11 +1,11 @@
 import { state, STORE_V, saveSet } from './state.js';
 import { toast, showError, hideError } from './utils.js';
 import { map } from './map.js';
-import { render, renderView, renderStopList, toggleVisited, exportRoute, exportToGoogleMaps, computeMaxClusters,
+import { render, renderView, renderStopList, toggleVisited, exportRoute, exportToGoogleMaps, exportToAppleMaps, computeMaxClusters,
   showHomeModal, hideHomeModal, confirmHome, showStartModal, hideStartModal, confirmStart,
   setSheetState, toggleRouteDropdown, closeRouteDropdown } from './ui.js';
-import { startNavigation, stopNavigation, updateNavUI, openNavDirPanel, closeNavDirPanel } from './nav.js';
 import { showAddrModal, hideAddrModal, resetToDefaultStops, setupAutocomplete, parsePastedText, addManualAddress, confirmAddresses, initAddressUI } from './addresses.js';
+import { startTour, shouldShowTour, resetTour, dismissTour, isTourActive } from './tour.js';
 
 // Mobile view helpers
 function isMobile() { return window.innerWidth < 768; }
@@ -58,28 +58,12 @@ document.getElementById('topCard').onclick = () => {
   if (isMobile()) { switchMobileView('plan'); }
   else { setSheetState(state.sheetState === 'expanded' ? 'peek' : 'expanded'); }
 };
-document.getElementById('startNavBtn').onclick = () => { if (isMobile()) switchMobileView('map'); startNavigation(renderView); };
 document.getElementById('gmapsFullRouteBtn').onclick = exportToGoogleMaps;
+document.getElementById('appleMapsBtn').onclick = exportToAppleMaps;
 document.getElementById('nextStopCard').addEventListener('dblclick', () => {
   const id = parseInt(document.getElementById('nextStopCard').dataset.spotId);
   if (id) toggleVisited(id);
 });
-document.getElementById('navClose').onclick = () => stopNavigation(renderView, setSheetState);
-document.getElementById('navMarkArrived').onclick = () => {
-  if (!state.navRoute || state.navCurrentLeg >= state.navRoute.stops.length) return;
-  const sp = state.navRoute.stops[state.navCurrentLeg];
-  state.visitedSet.add(sp.id); saveSet(STORE_V, state.visitedSet);
-  toast(`Marked ${sp.street} as visited`);
-  if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-  state.navCurrentLeg++;
-  updateNavUI();
-  document.getElementById('progressBar').style.width = `${state.SPOTS.length ? (state.visitedSet.size / state.SPOTS.length) * 100 : 0}%`;
-};
-document.getElementById('recenterBtn').onclick = () => { state.userPanned = false; if (state.gpsPos) map.panTo([state.gpsPos.lat, state.gpsPos.lng]); };
-
-// Nav directions panel
-document.getElementById('navDirClose').onclick = closeNavDirPanel;
-document.getElementById('navShowDirs').onclick = openNavDirPanel;
 
 // Panel toggle
 let panelHidden = false;
@@ -126,24 +110,25 @@ document.getElementById('toggleVisitedBtn').onclick = () => {
 // Export buttons
 document.getElementById('exportBtn').onclick = exportToGoogleMaps;
 document.getElementById('exportTxtBtn').onclick = exportRoute;
+document.getElementById('tourBtn').onclick = () => { resetTour(); startTour(); };
 
 // Keyboard shortcuts
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
+    if (isTourActive()) { dismissTour(); return; }
     if (document.getElementById('addrModal').classList.contains('show')) { hideAddrModal(); return; }
-    if (state.isNavigating) { stopNavigation(renderView, setSheetState); return; }
     if (document.getElementById('homeModal').classList.contains('show')) { hideHomeModal(); return; }
     if (document.getElementById('startModal').classList.contains('show')) { hideStartModal(); return; }
     if (isMobile()) { switchMobileView('map'); } else { setSheetState('collapsed'); } return;
   }
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-  if (e.key === 'n' || e.key === 'N') startNavigation(renderView);
-  else if (e.key === 'h' || e.key === 'H') showHomeModal();
+  if (e.key === 'h' || e.key === 'H') showHomeModal();
   else if (e.key === 'r' || e.key === 'R') { document.getElementById('resetBtn').click(); }
   else if (e.key === 'e') exportToGoogleMaps();
   else if (e.key === 'E') exportRoute();
   else if (e.key === '=' || e.key === '+') map.zoomIn();
   else if (e.key === '-') map.zoomOut();
+  else if (e.key === '?') { resetTour(); startTour(); }
   else if (e.key >= '1' && e.key <= '9') {
     const idx = parseInt(e.key) - 1;
     if (idx < state.currentRoutes.length) { state.activeFilter = state.activeFilter === idx ? -1 : idx; renderView(); }
@@ -323,3 +308,11 @@ if (navigator.geolocation) {
 if (!navigator.onLine) updateOnlineStatus();
 document.getElementById('progressBar').style.width = `${state.SPOTS.length ? (state.visitedSet.size / state.SPOTS.length) * 100 : 0}%`;
 render();
+
+// Guided tour on first visit
+if (shouldShowTour()) {
+  setTimeout(startTour, 1200);
+}
+
+// Allow re-triggering tour from console: window.resetTour()
+window.resetTour = () => { resetTour(); startTour(); };

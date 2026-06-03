@@ -1,5 +1,3 @@
-import { state } from './state.js';
-
 const darkQuery = window.matchMedia('(prefers-color-scheme:dark)');
 
 function getStyle(isDark) {
@@ -26,9 +24,6 @@ darkQuery.addEventListener('change', e => {
   map.once('style.load', () => restoreLayers());
 });
 
-map.on('movestart', e => {
-  if (state.isNavigating && e.originalEvent) state.userPanned = true;
-});
 
 let markers = [];
 let popups = [];
@@ -191,26 +186,6 @@ export function gpsIcon() {
   return {html: '<div class="gps-dot"><div class="gps-dot-core"></div><div class="gps-dot-ring"></div></div>'};
 }
 
-// Navigation camera: 3D pitched view following GPS
-export function setNavCamera(lat, lng, bearing, animate = true) {
-  const options = {
-    center: [lng, lat],
-    zoom: 17,
-    pitch: 60,
-    bearing: bearing || 0
-  };
-  if (animate) {
-    map.easeTo({...options, duration: 800});
-  } else {
-    map.jumpTo(options);
-  }
-}
-
-export function resetCamera(animate = true) {
-  const options = {pitch: 0, bearing: 0};
-  if (animate) map.easeTo({...options, duration: 500});
-  else map.jumpTo(options);
-}
 
 // Compatibility layer for existing code
 map.setView = function(latlng, zoom, opts) {

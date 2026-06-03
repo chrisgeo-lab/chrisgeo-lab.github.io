@@ -152,10 +152,10 @@ export function renderView() {
     bounds.push([state.startPoint.lat, state.startPoint.lng]);
   }
   if (state.persistentGpsMarker) { state.persistentGpsMarker.remove(); state.persistentGpsMarker = null; }
-  if (state.gpsPos && !state.isNavigating) {
+  if (state.gpsPos) {
     state.persistentGpsMarker = addMarker(state.gpsPos.lat, state.gpsPos.lng, gpsIcon());
   }
-  if (bounds.length && !state.isNavigating && !state.suppressFitBounds) {
+  if (bounds.length && !state.suppressFitBounds) {
     const isDesktop = window.innerWidth >= 768;
     const padding = isDesktop ? {paddingTopLeft: [60, 80], paddingBottomRight: [420, 60]} : {padding: [60, 220]};
     map.fitBounds(bounds, padding);
@@ -481,6 +481,39 @@ export function exportToGoogleMaps() {
   } else {
     toast('Opening in Google Maps...');
   }
+  window.open(url, '_blank');
+}
+
+export function exportToAppleMaps() {
+  if (!state.currentRoutes.length) { toast('No routes to export'); return; }
+  if (state.activeFilter < 0 && state.currentRoutes.length > 1) {
+    toast('Select a single route to open in Apple Maps');
+    return;
+  }
+
+  const rd = state.activeFilter >= 0 ? state.currentRoutes[state.activeFilter] : state.currentRoutes[0];
+  const stops = [];
+  for (const idx of rd.route) {
+    const sp = typeof idx === 'number' ? state.SPOTS[idx] : idx;
+    if (!state.visitedSet.has(sp.id)) stops.push(sp);
+  }
+  if (!stops.length) { toast('All stops visited!'); return; }
+
+  const origin = getStartLocation();
+  const params = new URLSearchParams({dirflg: 'd'});
+
+  if (origin) {
+    params.set('saddr', `${origin.lat},${origin.lng}`);
+  } else {
+    params.set('saddr', spotToAddr(stops[0]));
+  }
+
+  const waypoints = (origin ? stops : stops.slice(1)).map(sp => spotToAddr(sp));
+  if (state.home) waypoints.push(`${state.home.lat},${state.home.lng}`);
+  params.set('daddr', waypoints.join('+to:'));
+
+  const url = 'https://maps.apple.com/?' + params.toString();
+  toast('Opening in Apple Maps...');
   window.open(url, '_blank');
 }
 
