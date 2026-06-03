@@ -208,50 +208,70 @@
 <div class="modal-overlay" id="addrModal" role="dialog" aria-modal="true" aria-labelledby="addrModalTitle">
   <div class="addr-modal">
     <div class="addr-header">
-      <h3 id="addrModalTitle">Manage Stops</h3>
-      <p>Import addresses from a file, paste them in, or add them one at a time.</p>
+      <div class="addr-header-top">
+        <h3 id="addrModalTitle">Manage Stops</h3>
+        <button class="addr-close-btn" id="addrCloseBtnX" aria-label="Close">&times;</button>
+      </div>
+      <p>Import addresses from a file, paste them in, or add one at a time.</p>
     </div>
     <div class="addr-tabs">
-      <button class="addr-tab active" data-tab="import">Import File</button>
-      <button class="addr-tab" data-tab="paste">Paste</button>
-      <button class="addr-tab" data-tab="manual">Add Manually</button>
+      <button class="addr-tab active" data-tab="import">
+        <span class="addr-tab-icon">&#128194;</span>
+        <span class="addr-tab-label">Import</span>
+      </button>
+      <button class="addr-tab" data-tab="paste">
+        <span class="addr-tab-icon">&#128203;</span>
+        <span class="addr-tab-label">Paste</span>
+      </button>
+      <button class="addr-tab" data-tab="manual">
+        <span class="addr-tab-icon">&#43;</span>
+        <span class="addr-tab-label">Add</span>
+      </button>
     </div>
     <div class="addr-body">
       <div class="addr-section active" id="addrImportSection">
         <div class="addr-drop-zone" id="addrDropZone">
           <div class="addr-drop-zone-icon">&#128194;</div>
-          <div class="addr-drop-zone-text">Drop CSV or Excel file here</div>
-          <div class="addr-drop-zone-hint">or click to browse &middot; .csv, .xlsx, .xls, .tsv</div>
+          <div class="addr-drop-zone-text">Drop file here or tap to browse</div>
+          <div class="addr-drop-zone-hint">CSV, Excel, TSV supported</div>
         </div>
         <input type="file" class="addr-file-input" id="addrFileInput" accept=".csv,.xlsx,.xls,.tsv,.txt">
-        <div style="margin-top:12px;font-size:12px;color:var(--secondary);line-height:1.5">
-          <strong>Expected columns:</strong> street (or address), city, state &mdash; optional: zip, lat, lng<br>
-          First row should be headers. We'll auto-detect column names.
+        <div class="addr-help-card">
+          <div class="addr-help-title">Expected format</div>
+          <div class="addr-help-text">Columns: street, city, state &mdash; optional: zip, lat, lng<br>First row should be headers.</div>
         </div>
       </div>
       <div class="addr-section" id="addrPasteSection">
-        <textarea class="addr-paste-area" id="addrPasteArea" placeholder="Paste addresses here, one per line.&#10;&#10;Formats accepted:&#10;  11 Rahway Rd, Burlington, MA, 01803&#10;  11 Rahway Rd | Burlington | MA&#10;  street, city, state, zip"></textarea>
-        <div style="margin-top:8px;font-size:11px;color:var(--secondary)">
-          One address per line. State is required. Use commas, tabs, pipes, or spaced columns.
+        <textarea class="addr-paste-area" id="addrPasteArea" placeholder="Paste addresses, one per line&#10;&#10;Examples:&#10;  123 Main St, Boston, MA 02101&#10;  456 Oak Ave, Cambridge, MA"></textarea>
+        <div class="addr-help-card">
+          <div class="addr-help-text">One address per line. State is required. Commas, tabs, or pipes as delimiters.</div>
         </div>
-        <button class="addr-add-btn addr-add-btn-full" id="addrParseBtn">Parse Addresses</button>
+        <button class="addr-action-btn" id="addrParseBtn">Parse Addresses</button>
       </div>
       <div class="addr-section" id="addrManualSection">
         <div class="addr-autocomplete">
-          <input type="text" id="addrManualSearch" placeholder="Start typing an address..." autocomplete="off" style="width:100%;padding:10px 12px;border:1.5px solid var(--separator);border-radius:var(--radius-xs);font-size:14px;font-family:var(--font);background:var(--bg);color:var(--text);outline:none;margin-bottom:8px">
+          <input type="text" class="addr-search-input" id="addrManualSearch" placeholder="Search for an address..." autocomplete="off">
           <div class="addr-ac-list" id="addrAcList"></div>
         </div>
-        <div class="addr-manual-row">
-          <input type="text" id="addrManualStreet" placeholder="Street" style="flex:2">
-          <input type="text" id="addrManualCity" placeholder="City" style="flex:1">
+        <div class="addr-field-group">
+          <div class="addr-field addr-field-street">
+            <input type="text" id="addrManualStreet" placeholder="Street address">
+          </div>
+          <div class="addr-field addr-field-city">
+            <input type="text" id="addrManualCity" placeholder="City">
+          </div>
+          <div class="addr-field-row">
+            <div class="addr-field addr-field-state">
+              <input type="text" id="addrManualState" placeholder="State *">
+            </div>
+            <div class="addr-field addr-field-zip">
+              <input type="text" id="addrManualZip" placeholder="ZIP">
+            </div>
+          </div>
         </div>
-        <div class="addr-manual-row" style="margin-top:0">
-          <input type="text" id="addrManualState" placeholder="State *" style="flex:1">
-          <input type="text" id="addrManualZip" placeholder="Zip" style="max-width:90px">
-          <button class="addr-add-btn" id="addrManualAddBtn">Add</button>
-        </div>
-        <div style="font-size:11px;color:var(--secondary);margin-bottom:12px">
-          Type above for suggestions, or fill in fields manually. Press Enter to add.
+        <button class="addr-action-btn" id="addrManualAddBtn">Add Stop</button>
+        <div class="addr-help-card">
+          <div class="addr-help-text">Search above for suggestions, or fill in fields manually.</div>
         </div>
       </div>
       <div class="addr-preview" id="addrPreview" style="display:none"></div>
@@ -261,14 +281,16 @@
         <div class="addr-geocode-progress-fill" id="addrGeoProgressFill"></div>
       </div>
     </div>
+    <div class="addr-replace-note" id="addrReplaceNote" style="display:none">
+      <span>&#9888;</span> This will replace current stops and reset progress
+    </div>
     <div class="addr-footer">
       <span class="addr-footer-count" id="addrFooterCount">0 addresses staged</span>
-      <button class="modal-btn modal-btn-danger modal-btn-sm" id="addrResetDefaultBtn">Clear All Stops</button>
-      <button class="modal-btn modal-btn-cancel" id="addrCancelBtn">Cancel</button>
-      <button class="modal-btn modal-btn-primary" id="addrConfirmBtn" disabled>Apply Stops</button>
-    </div>
-    <div class="addr-replace-note" id="addrReplaceNote" style="display:none;padding:0 24px 12px">
-      <span>&#9888;</span> This will replace all current stops and reset progress
+      <div class="addr-footer-actions">
+        <button class="addr-footer-btn addr-footer-btn-danger" id="addrResetDefaultBtn">Clear All</button>
+        <button class="addr-footer-btn addr-footer-btn-cancel" id="addrCancelBtn">Cancel</button>
+        <button class="addr-footer-btn addr-footer-btn-primary" id="addrConfirmBtn" disabled>Apply Stops</button>
+      </div>
     </div>
   </div>
 </div>

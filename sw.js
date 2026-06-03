@@ -1,4 +1,4 @@
-const CACHE_NAME = 'routeflow-v7';
+const CACHE_NAME = 'routeflow-v9';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -64,6 +64,7 @@ self.addEventListener('fetch', e => {
   }
 
   if (url.hostname === 'router.project-osrm.org' ||
+      url.hostname === 'routing.openstreetmap.de' ||
       url.hostname === 'nominatim.openstreetmap.org' ||
       url.hostname === 'photon.komoot.io' ||
       url.hostname === 'geocoding.geo.census.gov') {
