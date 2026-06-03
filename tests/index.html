@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>TSP Tests</title>
+  <style>
+    body { font-family: monospace; margin: 2rem; background: #1a1a1a; color: #eee; }
+    h1 { font-size: 1.4rem; }
+    h2 { font-size: 1.1rem; margin-bottom: 1rem; }
+    .pass { color: #4caf50; margin: 0.3rem 0; }
+    .fail { color: #f44336; margin: 0.3rem 0; }
+    #results { margin-top: 1rem; }
+  </style>
+</head>
+<body>
+  <h1>TSP Test Suite</h1>
+  <div id="results">Running...</div>
+  <script type="module">
+    import './solver.test.js';
+    import './addresses.test.js';
+    import './utils.test.js';
+    import { renderResults } from './runner.js';
+    renderResults();
+  </script>
+</body>
+</html>
