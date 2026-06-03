@@ -141,7 +141,6 @@ body{
   box-shadow:0 -4px 40px rgba(0,0,0,.08);
   transition:transform .35s cubic-bezier(.4,0,.2,1);
   height:55vh;display:flex;flex-direction:column;
-  touch-action:none;
   transform:translateY(calc(55vh - 200px))
 }
 .bottom-sheet.expanded{transform:translateY(0)}
@@ -160,6 +159,27 @@ body{
 .sheet-handle-area:hover .sheet-handle{opacity:.8;width:44px}
 .sheet-sticky{flex-shrink:0;background:var(--card-solid);z-index:1}
 .sheet-content{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
+
+/* Travel mode toggle */
+.travel-mode-bar{
+  display:none;padding:8px 16px;border-bottom:1px solid var(--separator);
+  gap:4px;background:var(--card-solid)
+}
+.travel-mode-bar.show{display:flex}
+.travel-mode-btn{
+  flex:1;display:flex;align-items:center;justify-content:center;gap:6px;
+  padding:8px 12px;border-radius:10px;border:none;cursor:pointer;
+  background:var(--fill);color:var(--secondary);font-size:12px;font-weight:600;
+  font-family:var(--font);transition:all .2s
+}
+.travel-mode-btn:active{transform:scale(.95)}
+.travel-mode-btn.active{
+  background:var(--blue);color:#fff;
+  box-shadow:0 2px 8px rgba(0,122,255,.25)
+}
+.travel-mode-btn:hover:not(.active){background:var(--separator);color:var(--text)}
+.travel-mode-icon{font-size:14px;line-height:1}
+.travel-mode-label{font-size:11px;font-weight:600}
 
 /* Route summary card */
 .route-summary{
@@ -685,18 +705,22 @@ body{
     padding-top:calc(env(safe-area-inset-top) + 4px);
     padding-bottom:calc(56px + env(safe-area-inset-bottom));
     box-shadow:none;
-    transition:transform .3s cubic-bezier(.4,0,.2,1)
+    transition:transform .3s cubic-bezier(.4,0,.2,1);
+    pointer-events:none
   }
   .bottom-sheet.mobile-plan-visible{
-    transform:translateY(0)
+    transform:translateY(0);
+    pointer-events:auto
   }
   .bottom-sheet.expanded,
   .bottom-sheet.collapsed{
-    transform:translateY(100%)
+    transform:translateY(100%);
+    pointer-events:none
   }
   .bottom-sheet.expanded.mobile-plan-visible,
   .bottom-sheet.collapsed.mobile-plan-visible{
-    transform:translateY(0)
+    transform:translateY(0);
+    pointer-events:auto
   }
   .sheet-handle-area{display:none}
 
@@ -712,6 +736,12 @@ body{
   }
   #gmapsExportCard{margin:0 12px 8px !important}
   .gmaps-btn{padding:14px 16px;font-size:14px}
+
+  /* Travel mode */
+  .travel-mode-bar{padding:6px 12px;gap:3px}
+  .travel-mode-btn{padding:8px 8px;gap:4px}
+  .travel-mode-icon{font-size:13px}
+  .travel-mode-label{font-size:10px}
 
   /* Route summary */
   .route-summary{padding:12px 14px;gap:6px}
@@ -772,6 +802,10 @@ body{
   .top-subtitle{display:none}
   .cluster-card{padding:4px 8px;gap:4px}
   .cluster-card label{font-size:10px}
+  .travel-mode-bar{padding:4px 8px;gap:2px}
+  .travel-mode-btn{padding:4px 6px}
+  .travel-mode-icon{font-size:11px}
+  .travel-mode-label{font-size:9px}
   .mobile-nav{padding:4px 0 calc(4px + env(safe-area-inset-bottom))}
   .mobile-nav-icon{font-size:16px}
   .mobile-nav-label{font-size:9px}
@@ -842,7 +876,7 @@ body{
   background:var(--fill);color:var(--secondary);font-size:20px;line-height:1;
   display:flex;align-items:center;justify-content:center;transition:all .15s
 }
-.addr-close-btn:hover{background:rgba(0,0,0,.08);color:var(--text)}
+.addr-close-btn:hover{background:var(--separator);color:var(--text)}
 .addr-close-btn:active{transform:scale(.9)}
 .addr-header p{font-size:13px;color:var(--secondary);line-height:1.5;margin-top:6px}
 .addr-tabs{
@@ -858,7 +892,7 @@ body{
   background:var(--blue);color:#fff;
   box-shadow:0 2px 8px rgba(0,122,255,.3)
 }
-.addr-tab:hover:not(.active){background:rgba(0,0,0,.06);color:var(--text)}
+.addr-tab:hover:not(.active){background:var(--separator);color:var(--text)}
 .addr-tab:active{transform:scale(.96)}
 .addr-tab-icon{font-size:16px;line-height:1}
 .addr-tab-label{font-size:11px;font-weight:600;letter-spacing:.01em}
@@ -869,7 +903,7 @@ body{
 .addr-drop-zone{
   border:2px dashed var(--separator);border-radius:16px;
   padding:40px 24px;text-align:center;cursor:pointer;
-  transition:all .25s;background:rgba(0,0,0,.02)
+  transition:all .25s;background:var(--fill)
 }
 .addr-drop-zone:hover,.addr-drop-zone.dragover{
   border-color:var(--blue);background:rgba(0,122,255,.04);
