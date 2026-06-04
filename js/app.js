@@ -8,14 +8,16 @@ import { showHomeModal, hideHomeModal, confirmHome, showStartModal, hideStartMod
 import { showAddrModal, hideAddrModal, resetToDefaultStops, setupAutocomplete, parsePastedText, addManualAddress, confirmAddresses, initAddressUI, setImportMode } from './addresses.js';
 import { startTour, shouldShowTour, resetTour, dismissTour, isTourActive } from './tour.js';
 
-// Dismiss loading screen once map tiles are ready
-mapReady.then(() => {
+// Dismiss loading screen once map tiles are ready (with timeout fallback)
+function dismissLoader() {
   const loader = document.getElementById('appLoading');
-  if (loader) {
+  if (loader && !loader.classList.contains('hidden')) {
     loader.classList.add('hidden');
     setTimeout(() => loader.remove(), 500);
   }
-});
+}
+mapReady.then(dismissLoader);
+setTimeout(dismissLoader, 5000);
 
 // Mobile view helpers
 function isMobile() { return window.innerWidth < 768; }
