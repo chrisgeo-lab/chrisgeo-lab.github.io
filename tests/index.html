@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>TSP Tests</title>
+  <title>RouteFlow Tests</title>
   <style>
     body { font-family: monospace; margin: 2rem; background: #1a1a1a; color: #eee; }
     h1 { font-size: 1.4rem; }
@@ -10,15 +10,27 @@
     .pass { color: #4caf50; margin: 0.3rem 0; }
     .fail { color: #f44336; margin: 0.3rem 0; }
     #results { margin-top: 1rem; }
+    /* setup.js injects #map and a few other DOM stubs so that source modules
+       which look them up at module-load time don't blow up. Hide them. */
+    #map, #loading, #errorBanner, #toast, #clusterSlider, #clusterVal { display: none; }
   </style>
 </head>
 <body>
-  <h1>TSP Test Suite</h1>
+  <h1>RouteFlow Test Suite</h1>
   <div id="results">Running...</div>
   <script type="module">
+    // setup.js installs window.maplibregl + DOM stubs. It MUST be the first
+    // thing that runs so that any test which transitively imports js/map.js
+    // (demo.test.js, planner.test.js) finds a usable global.
+    import './setup.js';
+
     import './solver.test.js';
     import './addresses.test.js';
     import './utils.test.js';
+    import './routing.test.js';
+    import './demo.test.js';
+    import './planner.test.js';
+
     import { renderResults } from './runner.js';
     renderResults();
   </script>
