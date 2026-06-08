@@ -3,6 +3,9 @@ import { esc, toast, trapFocus } from './utils.js';
 import { render, computeMaxClusters } from './ui.js';
 import { geocodeAddress } from './geocoder.js';
 import { normalizeState, parseAddressLine } from './address-parse.js';
+import { clearAllAnchors } from './anchors.js';
+import { bindPhotonSearch, photonFeatureToAddress } from './photon.js';
+import { parseCSV as parseCSVRows, parseXLSX } from './import-parsers.js';
 
 let stagedAddresses = [];
 let importMode = 'append';
@@ -74,11 +77,7 @@ function processExcel(file) {
   const reader = new FileReader();
   reader.onload = async e => {
     try {
-      const data = new Uint8Array(e.target.result);
-      const zip = await parseZip(data);
-      const sharedStrings = parseSharedStrings(zip['xl/sharedStrings.xml'] || '');
-      const sheetXml = zip['xl/worksheets/sheet1.xml'] || '';
-      const rows = parseSheetRows(sheetXml, sharedStrings);
+      const rows = await parseXLSX(e.target.result);
       if (rows.length < 2) { toast('No data rows found'); return; }
       parseRows(rows[0], rows.slice(1));
     } catch (err) {
@@ -89,90 +88,10 @@ function processExcel(file) {
   reader.readAsArrayBuffer(file);
 }
 
-async function parseZip(data) {
-  const files = {};
-  const view = new DataView(data.buffer);
-  let offset = 0;
-  while (offset < data.length - 4) {
-    const sig = view.getUint32(offset, true);
-    if (sig !== 0x04034b50) break;
-    const compMethod = view.getUint16(offset + 8, true);
-    const compSize = view.getUint32(offset + 18, true);
-    const nameLen = view.getUint16(offset + 26, true);
-    const extraLen = view.getUint16(offset + 28, true);
-    const name = new TextDecoder().decode(data.slice(offset + 30, offset + 30 + nameLen));
-    const fileData = data.slice(offset + 30 + nameLen + extraLen, offset + 30 + nameLen + extraLen + compSize);
-    if (compMethod === 0) {
-      files[name] = new TextDecoder().decode(fileData);
-    } else if (compMethod === 8) {
-      try {
-        const ds = new DecompressionStream('deflate-raw');
-        const writer = ds.writable.getWriter();
-        writer.write(fileData); writer.close();
-        const reader = ds.readable.getReader();
-        const chunks = []; let done = false;
-        while (!done) { const r = await reader.read(); if (r.value) chunks.push(r.value); done = r.done; }
-        const total = chunks.reduce((a, c) => a + c.length, 0);
-        const result = new Uint8Array(total); let pos = 0;
-        chunks.forEach(c => { result.set(c, pos); pos += c.length; });
-        files[name] = new TextDecoder().decode(result);
-      } catch { files[name] = ''; }
-    }
-    offset += 30 + nameLen + extraLen + compSize;
-  }
-  return files;
-}
-
-function parseSharedStrings(xml) {
-  const strings = [];
-  const regex = /<t[^>]*>([^<]*)<\/t>/g;
-  let m; while ((m = regex.exec(xml)) !== null) strings.push(m[1]);
-  return strings;
-}
-
-function parseSheetRows(xml, strings) {
-  const rows = [];
-  const rowRegex = /<row[^>]*>([\s\S]*?)<\/row>/g;
-  const cellRegex = /<c\s+r="([A-Z]+)\d+"[^>]*(?:t="([^"]*)")?[^>]*>(?:<v>([^<]*)<\/v>)?/g;
-  let rm;
-  while ((rm = rowRegex.exec(xml)) !== null) {
-    const cells = []; let cm;
-    cellRegex.lastIndex = 0;
-    while ((cm = cellRegex.exec(rm[1])) !== null) {
-      const col = cm[1].charCodeAt(0) - 65;
-      let val = cm[3] || '';
-      if (cm[2] === 's' && strings[parseInt(val)]) val = strings[parseInt(val)];
-      while (cells.length <= col) cells.push('');
-      cells[col] = val.trim();
-    }
-    if (cells.some(c => c)) rows.push(cells);
-  }
-  return rows;
-}
-
 function parseCSV(text, delimiter = ',') {
-  const lines = text.split(/\r?\n/).filter(l => l.trim());
-  if (lines.length < 2) { toast('No data rows found'); return; }
-  const headerLine = lines[0];
-  if (delimiter === ',' && !headerLine.includes(',') && headerLine.includes('\t')) delimiter = '\t';
-  if (delimiter === ',' && !headerLine.includes(',') && headerLine.includes('|')) delimiter = '|';
-  const rows = lines.map(l => parseCSVLine(l, delimiter));
+  const rows = parseCSVRows(text, delimiter);
+  if (!rows.length) { toast('No data rows found'); return; }
   parseRows(rows[0], rows.slice(1));
-}
-
-function parseCSVLine(line, delim) {
-  if (delim === ',' && line.includes('"')) {
-    const result = []; let current = '', inQuotes = false;
-    for (let i = 0; i < line.length; i++) {
-      const c = line[i];
-      if (c === '"') { inQuotes = !inQuotes; }
-      else if (c === delim && !inQuotes) { result.push(current.trim()); current = ''; }
-      else { current += c; }
-    }
-    result.push(current.trim());
-    return result;
-  }
-  return line.split(delim).map(s => s.trim().replace(/^"|"$/g, ''));
 }
 
 function parseRows(headers, dataRows) {
@@ -363,8 +282,7 @@ function applyValidStops(valid) {
     state.visitedSet.clear(); saveSet(STORE_V, state.visitedSet);
     // Stale start/end anchors from the previous dataset would dangle here;
     // clear them rather than carrying mismatched coordinates onto the new map.
-    state.startPoint = null; localStorage.removeItem('routeflow-start');
-    state.home = null; localStorage.removeItem('routeflow-home');
+    clearAllAnchors();
     resetRouteState();
     state.numClusters = 1; state.activeFilter = -1;
     document.getElementById('clusterSlider').value = 1;
@@ -406,49 +324,31 @@ function showFixAddrPrompt(addr) {
     list.classList.remove('show');
     setTimeout(() => { input.focus(); input.select(); }, 100);
 
-    let fixAcTimer = null, fixAcResults = [], fixAcIdx = -1, fixReqId = 0;
+    let fixAcResults = [], fixAcIdx = -1;
 
-    function onFixInput() {
-      clearTimeout(fixAcTimer);
-      const q = input.value.trim();
-      if (q.length < 3) { list.classList.remove('show'); fixAcResults = []; return; }
-      fixAcTimer = setTimeout(async () => {
-        const myReq = ++fixReqId;
-        try {
-          const params = new URLSearchParams({q, limit: '5', lang: 'en'});
-          if (state.gpsPos) params.append('lat', state.gpsPos.lat), params.append('lon', state.gpsPos.lng);
-          const r = await fetch(`https://photon.komoot.io/api/?${params}`);
-          if (!r.ok || myReq !== fixReqId) return;
-          const data = await r.json();
-          if (myReq !== fixReqId) return;
-          fixAcResults = (data.features || []).filter(f => f.properties.street || f.properties.name);
-          fixAcIdx = -1;
-          if (fixAcResults.length) { list.classList.add('show'); renderFixAc(); }
-          else list.classList.remove('show');
-        } catch {}
-      }, 300);
-    }
+    const teardownPhoton = bindPhotonSearch(input, (features) => {
+      fixAcResults = features;
+      fixAcIdx = -1;
+      if (fixAcResults.length) { list.classList.add('show'); renderFixAc(); }
+      else list.classList.remove('show');
+    });
 
     function renderFixAc() {
       list.innerHTML = '';
       fixAcResults.forEach((f, i) => {
-        const p = f.properties;
-        const street = [p.housenumber, p.street || p.name].filter(Boolean).join(' ');
-        const sub = [p.city || p.locality, p.state, p.postcode].filter(Boolean).join(', ');
+        const a = photonFeatureToAddress(f);
+        const sub = [a.city, a.state, a.zip].filter(Boolean).join(', ');
         const item = document.createElement('div');
         item.className = 'addr-ac-item' + (i === fixAcIdx ? ' active' : '');
-        item.innerHTML = `<div class="addr-ac-item-main">${esc(street || p.name || '')}</div><div class="addr-ac-item-sub">${esc(sub)}</div>`;
+        item.innerHTML = `<div class="addr-ac-item-main">${esc(a.street || a.name)}</div><div class="addr-ac-item-sub">${esc(sub)}</div>`;
         item.onmousedown = e => { e.preventDefault(); selectFixResult(f); };
         list.appendChild(item);
       });
     }
 
     function selectFixResult(f) {
-      const p = f.properties;
-      const street = [p.housenumber, p.street || p.name].filter(Boolean).join(' ');
-      const city = p.city || p.locality || p.county || '';
-      const st = p.state || '';
-      input.value = [street, city, st].filter(Boolean).join(', ');
+      const a = photonFeatureToAddress(f);
+      input.value = [a.street, a.city, a.state].filter(Boolean).join(', ');
       list.classList.remove('show');
       fixAcResults = [];
     }
@@ -460,13 +360,12 @@ function showFixAddrPrompt(addr) {
       else if (e.key === 'Enter' && fixAcIdx >= 0) { e.preventDefault(); selectFixResult(fixAcResults[fixAcIdx]); }
     }
 
-    input.addEventListener('input', onFixInput);
     input.addEventListener('keydown', onFixKeydown);
 
     function cleanup() {
       modal.classList.remove('show');
       list.classList.remove('show');
-      input.removeEventListener('input', onFixInput);
+      teardownPhoton();
       input.removeEventListener('keydown', onFixKeydown);
       document.getElementById('fixAddrSkipBtn').onclick = null;
       document.getElementById('fixAddrRetryBtn').onclick = null;
@@ -489,29 +388,15 @@ function showFixAddrPrompt(addr) {
   });
 }
 
-// Autocomplete helper
+// Autocomplete helper used by the manual-add input.
 export function setupAutocomplete(inputEl, listEl, onSelect) {
-  let timer = null, activeIdx = -1, results = [], reqId = 0;
+  let activeIdx = -1, results = [];
 
-  inputEl.addEventListener('input', () => {
-    clearTimeout(timer);
-    const q = inputEl.value.trim();
-    if (q.length < 3) { listEl.classList.remove('show'); results = []; return; }
-    timer = setTimeout(async () => {
-      const myReq = ++reqId;
-      try {
-        const params = new URLSearchParams({q, limit: '5', lang: 'en'});
-        if (state.gpsPos) params.append('lat', state.gpsPos.lat), params.append('lon', state.gpsPos.lng);
-        const r = await fetch(`https://photon.komoot.io/api/?${params}`);
-        if (!r.ok || myReq !== reqId) return;
-        const data = await r.json();
-        if (myReq !== reqId) return;
-        results = (data.features || []).filter(f => f.properties.street || f.properties.name);
-        activeIdx = -1;
-        if (results.length) { listEl.classList.add('show'); renderList(); }
-        else listEl.classList.remove('show');
-      } catch {}
-    }, 300);
+  bindPhotonSearch(inputEl, (features) => {
+    results = features;
+    activeIdx = -1;
+    if (results.length) { listEl.classList.add('show'); renderList(); }
+    else listEl.classList.remove('show');
   });
 
   inputEl.addEventListener('keydown', e => {
@@ -533,26 +418,21 @@ export function setupAutocomplete(inputEl, listEl, onSelect) {
   function renderList() {
     listEl.innerHTML = '';
     results.forEach((f, i) => {
-      const p = f.properties;
-      const street = [p.housenumber, p.street || p.name].filter(Boolean).join(' ');
-      const sub = [p.city || p.locality, p.state, p.postcode, p.country].filter(Boolean).join(', ');
+      const a = photonFeatureToAddress(f);
+      const sub = [a.city, a.state, a.zip, a.country].filter(Boolean).join(', ');
       const item = document.createElement('div');
       item.className = 'addr-ac-item' + (i === activeIdx ? ' active' : '');
-      item.innerHTML = `<div class="addr-ac-item-main">${esc(street || p.name || '')}</div><div class="addr-ac-item-sub">${esc(sub)}</div>`;
+      item.innerHTML = `<div class="addr-ac-item-main">${esc(a.street || a.name)}</div><div class="addr-ac-item-sub">${esc(sub)}</div>`;
       item.onmousedown = e => { e.preventDefault(); pick(f); };
       listEl.appendChild(item);
     });
   }
 
   function pick(f) {
-    const p = f.properties;
-    const street = [p.housenumber, p.street || p.name].filter(Boolean).join(' ');
-    const city = p.city || p.locality || p.county || '';
-    const st = p.state || '';
-    const zip = p.postcode || '';
+    const a = photonFeatureToAddress(f);
     listEl.classList.remove('show');
     results = [];
-    onSelect.pick({street, city, state: st, zip, feature: f});
+    onSelect.pick({street: a.street, city: a.city, state: a.state, zip: a.zip, feature: f});
   }
 }
 

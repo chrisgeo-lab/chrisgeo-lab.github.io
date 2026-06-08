@@ -79,7 +79,7 @@ export function loadDemo(renderFn) {
   syncClusterSlider(DEMO_NUM_CLUSTERS, DEMO_CLUSTER_MAX);
 
   // Kick render; planner will see demoMode=true and skip the network.
-  Promise.resolve(renderFn()).catch(() => {});
+  Promise.resolve(renderFn()).catch(e => console.error('Demo render failed:', e));
 
   // Frame the demo on the next paint regardless of route resolution.
   requestAnimationFrame(() => {

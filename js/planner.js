@@ -3,6 +3,7 @@ import { hd, setLoading, showError, hideError } from './utils.js';
 import { fetchTable, fetchRoute, buildHaversineMatrix, getFullDurationMatrix } from './routing.js';
 import { clusterUnvisited, tspWithMatrix } from './solver.js';
 import { renderView } from './ui.js';
+import { invalidateStaleSpotIds } from './anchors.js';
 
 function syntheticRoute(orderedIndices, color, name, waypoints) {
   const coords = waypoints.map(p => [p.lng, p.lat]);
@@ -66,14 +67,7 @@ export async function render() {
   if (!state.SPOTS.length) {
     state.currentRoutes = []; renderView(); return;
   }
-  // Drop anchor spotId references that no longer point at a valid SPOTS entry
-  // (e.g. after a Replace import). Keeps the lat/lng so the marker still renders.
-  if (state.startPoint && state.startPoint.spotId != null && !state.SPOTS[state.startPoint.spotId]) {
-    state.startPoint = {...state.startPoint, spotId: null};
-  }
-  if (state.home && state.home.spotId != null && !state.SPOTS[state.home.spotId]) {
-    state.home = {...state.home, spotId: null};
-  }
+  invalidateStaleSpotIds();
   const excludedSpotIds = new Set();
   if (state.startPoint && state.startPoint.spotId != null) excludedSpotIds.add(state.startPoint.spotId);
   if (state.home && state.home.spotId != null) excludedSpotIds.add(state.home.spotId);

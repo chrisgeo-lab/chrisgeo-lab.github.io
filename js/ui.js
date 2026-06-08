@@ -25,6 +25,19 @@ export function renderView() {
   const bounds = [];
   const routeSpotIds = new Set();
   const lineWeight = routes.length === 1 ? 5 : 4;
+  // If there are no resolved routes yet, render the raw stop list so users
+  // see something while routing is loading or after a routing failure.
+  if (!routes.length && state.SPOTS.length) {
+    state.SPOTS.forEach((spot, i) => {
+      if (state.visitedSet.has(spot.id) && !state.showVisitedMarkers) return;
+      const visited = state.visitedSet.has(spot.id);
+      const mk = addMarker(spot.lat, spot.lng, stopIcon(i + 1, '#007AFF', visited, false));
+      const addr = [spot.city, spot.state, spot.zip].filter(Boolean).join(', ');
+      const popup = `<div class="stop-popup"><div class="stop-popup-label" style="color:#007AFF">Stop ${i + 1}</div><div class="stop-popup-street">${esc(spot.street || '')}</div>${addr ? `<div class="stop-popup-addr">${esc(addr)}</div>` : ''}<button class="stop-popup-btn stop-popup-btn-visit" data-visit-id="${spot.id}">&#10003; Mark Visited</button></div>`;
+      bindPopup(mk, popup);
+      bounds.push([spot.lat, spot.lng]);
+    });
+  }
   routes.forEach(rd => {
     if (rd.geometry?.coordinates) {
       // geometry.coordinates is GeoJSON [lng, lat] — pass through unchanged.
@@ -193,6 +206,26 @@ export function renderStopList() {
   const el = document.getElementById('stopsView'); el.innerHTML = '';
   const routes = getActiveRoutes();
   const query = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
+  // No resolved route yet — show stops in import order so the panel isn't blank.
+  if (!routes.length && state.SPOTS.length) {
+    state.SPOTS.forEach((spot, i) => {
+      if (query && !spot.street.toLowerCase().includes(query) && (!spot.city || !spot.city.toLowerCase().includes(query))) return;
+      const visited = state.visitedSet.has(spot.id);
+      const item = document.createElement('div');
+      item.className = 'stop-item' + (visited ? ' visited' : '');
+      item.innerHTML = `
+        <div class="stop-item-check" role="checkbox" tabindex="0" aria-checked="${visited}" aria-label="Toggle ${esc(spot.street || 'stop')} visited">${visited ? '&#10003;' : ''}</div>
+        <div class="stop-item-num" style="background:#007AFF">${i + 1}</div>
+        <div class="stop-item-info">
+          <div class="stop-item-name">${esc(spot.street || `Stop ${i + 1}`)}</div>
+          <div class="stop-item-detail"><span>${esc(spot.city || '')}${spot.state ? ', ' + esc(spot.state) : ''}</span></div>
+        </div>`;
+      item.querySelector('.stop-item-check').onclick = (e) => { e.stopPropagation(); toggleVisited(spot.id); };
+      item.onclick = () => setView([spot.lat, spot.lng], 16);
+      el.appendChild(item);
+    });
+    return;
+  }
   routes.forEach((rd, ri) => {
     if (routes.length > 1) {
       const hdr = document.createElement('div');

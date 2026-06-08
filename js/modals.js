@@ -1,7 +1,8 @@
-import { state, STORE_H, saveJSON } from './state.js';
+import { state } from './state.js';
 import { toast, trapFocus } from './utils.js';
 import { geocodeFreeform } from './geocoder.js';
 import { render } from './ui.js';
+import { setAnchor, anchorFromSpotId } from './anchors.js';
 
 let releaseHomeTrap = null;
 let releaseStartTrap = null;
@@ -110,8 +111,7 @@ export async function confirmStart() {
   const mode = getActiveMode('startModeTabs');
 
   if (mode === 'gps') {
-    state.startPoint = null;
-    localStorage.removeItem('routeflow-start');
+    setAnchor('start', null);
     hideStartModal();
     state.durationMatrix = null;
     render();
@@ -121,9 +121,7 @@ export async function confirmStart() {
 
   if (mode === 'stop') {
     if (startSelectedIdx == null) { toast('Select a stop from the list'); return; }
-    const spot = state.SPOTS[startSelectedIdx];
-    state.startPoint = { lat: spot.lat, lng: spot.lng, label: spot.street || spot.label, spotId: startSelectedIdx };
-    saveJSON('routeflow-start', state.startPoint);
+    setAnchor('start', anchorFromSpotId(startSelectedIdx));
     hideStartModal();
     state.durationMatrix = null;
     render();
@@ -142,8 +140,7 @@ export async function confirmStart() {
       btn.disabled = false;
       btn.querySelector('.point-modal-btn-icon').textContent = '▶';
       if (result) {
-        state.startPoint = { lat: result.lat, lng: result.lng, label: result.label || val };
-        saveJSON('routeflow-start', state.startPoint);
+        setAnchor('start', { lat: result.lat, lng: result.lng, label: result.label || val });
         hideStartModal();
         state.durationMatrix = null;
         render();
@@ -207,8 +204,7 @@ export async function confirmHome() {
   const mode = getActiveMode('homeModeTabs');
 
   if (mode === 'none') {
-    state.home = null;
-    localStorage.removeItem(STORE_H);
+    setAnchor('home', null);
     hideHomeModal();
     render();
     toast('End point removed');
@@ -220,8 +216,7 @@ export async function confirmHome() {
       toast('GPS location not available');
       return;
     }
-    state.home = { lat: state.gpsPos.lat, lng: state.gpsPos.lng, label: 'Current Location', isGps: true };
-    saveJSON(STORE_H, state.home);
+    setAnchor('home', { lat: state.gpsPos.lat, lng: state.gpsPos.lng, label: 'Current Location', isGps: true });
     hideHomeModal();
     state.durationMatrix = null;
     render();
@@ -231,9 +226,7 @@ export async function confirmHome() {
 
   if (mode === 'stop') {
     if (homeSelectedIdx == null) { toast('Select a stop from the list'); return; }
-    const spot = state.SPOTS[homeSelectedIdx];
-    state.home = { lat: spot.lat, lng: spot.lng, label: spot.street || spot.label, spotId: homeSelectedIdx };
-    saveJSON(STORE_H, state.home);
+    setAnchor('home', anchorFromSpotId(homeSelectedIdx));
     hideHomeModal();
     state.durationMatrix = null;
     render();
@@ -252,8 +245,7 @@ export async function confirmHome() {
       btn.disabled = false;
       btn.querySelector('.point-modal-btn-icon').textContent = '■';
       if (result) {
-        state.home = { lat: result.lat, lng: result.lng, label: result.label || val };
-        saveJSON(STORE_H, state.home);
+        setAnchor('home', { lat: result.lat, lng: result.lng, label: result.label || val });
         hideHomeModal();
         state.durationMatrix = null;
         render();

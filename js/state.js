@@ -51,7 +51,9 @@ export const OSRM_PROFILES = {
 };
 export const STORE_V = 'routeflow-visited';
 export const STORE_H = 'routeflow-home';
+export const STORE_START = 'routeflow-start';
 export const STORE_CACHE = 'routeflow-osrm-cache';
+export const STORE_TRAVEL_MODE = 'routeflow-travel-mode';
 export const CACHE_MAX_ENTRIES = 50;
 
 // Migrate legacy localStorage keys (festival-* → routeflow-*)
@@ -151,7 +153,7 @@ export const state = {
   SPOTS: loadSpots(),
   visitedSet: loadSet(STORE_V),
   home: loadJSON(STORE_H),
-  startPoint: loadJSON('routeflow-start'),
+  startPoint: loadJSON(STORE_START),
   numClusters: 1,
   activeFilter: -1,
   currentRoutes: [],
@@ -164,6 +166,6 @@ export const state = {
   matrixFallback: false,
   demoMode: false,
   sheetState: 'peek',
-  travelMode: loadJSON('routeflow-travel-mode') || 'car',
+  travelMode: loadJSON(STORE_TRAVEL_MODE) || 'car',
   gpsState: 'unknown' // 'unknown' | 'granted' | 'denied' | 'unavailable'
 };
