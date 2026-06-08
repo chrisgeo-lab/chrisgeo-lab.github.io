@@ -6,6 +6,7 @@ function getStyle(isDark) {
     : 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json';
 }
 
+/** Singleton MapLibre instance for the app. */
 export const map = new maplibregl.Map({
   container: 'map',
   style: getStyle(darkQuery.matches),
@@ -25,6 +26,7 @@ export const map = new maplibregl.Map({
 });
 
 let mapLoaded = false;
+/** Resolves once the map's first style has loaded — gate for adding sources/layers. */
 export const mapReady = new Promise(resolve => {
   map.once('load', () => { mapLoaded = true; resolve(); });
 });
@@ -71,6 +73,7 @@ function add3DBuildings() {
 
 map.on('style.load', () => { add3DBuildings(); });
 
+/** Remove all markers, popups, and route layers; bumps the render epoch to invalidate pending adds. */
 export function clearMap() {
   renderEpoch++;
   markers.forEach(m => m.remove());
@@ -88,6 +91,13 @@ export function clearMap() {
   routeData = [];
 }
 
+/**
+ * Add an HTML-element marker at (lat,lng) using the icon descriptor from {@link stopIcon}/{@link homeIcon}/{@link gpsIcon}.
+ * @param {number} lat
+ * @param {number} lng
+ * @param {{html: string}} icon
+ * @returns {maplibregl.Marker}
+ */
 export function addMarker(lat, lng, icon) {
   const el = document.createElement('div');
   el.innerHTML = icon.html;
@@ -106,6 +116,14 @@ export function addMarker(lat, lng, icon) {
   return marker;
 }
 
+/**
+ * Add a route polyline as a GeoJSON line layer (with darker outline beneath).
+ * Defers the actual layer add until `mapReady` if the style is still loading.
+ * @param {Array<[number, number]>} coords  GeoJSON-style [lng, lat] pairs (MapLibre/OSRM native order — no internal swap).
+ * @param {string} color
+ * @param {number} [weight=5]
+ * @returns {string|null}  Source/layer id, or null when coords < 2.
+ */
 export function addPolyline(coords, color, weight = 5) {
   if (!coords || coords.length < 2) return null;
   const id = 'route-' + (++sourceCounter);
@@ -113,7 +131,7 @@ export function addPolyline(coords, color, weight = 5) {
     type: 'Feature',
     geometry: {
       type: 'LineString',
-      coordinates: coords.map(c => [c[1], c[0]])
+      coordinates: coords
     }
   };
 
@@ -151,6 +169,13 @@ function addRouteLayer(id, geojson, color, weight) {
   });
 }
 
+/**
+ * Build an HTML icon descriptor for a numbered stop marker.
+ * @param {number|string} n  Stop number (or check glyph when visited).
+ * @param {string} color
+ * @param {boolean} vis      Visited — dim and show check.
+ * @param {boolean} curr     Current next-stop — enlarge and add glow.
+ */
 export function stopIcon(n, color, vis, curr) {
   const sz = curr ? 26 : 22, op = vis ? 0.4 : 1;
   const bdr = curr ? '2.5px solid #fff' : '1.5px solid rgba(255,255,255,.8)';
@@ -159,14 +184,22 @@ export function stopIcon(n, color, vis, curr) {
   return {html: `<div style="width:${sz}px;height:${sz}px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;font-size:${curr ? 11 : 9}px;color:#fff;${glow};border:${bdr};opacity:${op}">${content}</div>`};
 }
 
+/** HTML icon descriptor for the home (end-point) marker. */
 export function homeIcon() {
   return {html: '<div style="width:22px;height:22px;border-radius:50%;background:#FF9500;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;box-shadow:0 2px 6px rgba(255,149,0,.4);border:1.5px solid #fff">&#9750;</div>'};
 }
 
+/** HTML icon descriptor for the live GPS dot (pulsing ring). */
 export function gpsIcon() {
   return {html: '<div class="gps-dot"><div class="gps-dot-core"></div><div class="gps-dot-ring"></div></div>'};
 }
 
+/**
+ * Recenter the map at `latlng` and zoom level. Accepts `[lat, lng]` array or `{lat, lng}`.
+ * @param {[number, number]|{lat:number, lng:number}} latlng
+ * @param {number} zoom
+ * @param {{animate?: boolean}} [opts]  `animate:false` jumps; default eases (600ms).
+ */
 export function setView(latlng, zoom, opts) {
   const center = Array.isArray(latlng) ? [latlng[1], latlng[0]] : [latlng.lng, latlng.lat];
   map.stop();
@@ -177,6 +210,12 @@ export function setView(latlng, zoom, opts) {
   }
 }
 
+/**
+ * Fit the map to a bounds rectangle. Accepts an array of `[lat, lng]` points or a MapLibre LngLatBounds.
+ * Padding accepts `{padding}`, `{paddingTopLeft, paddingBottomRight}`, or scalar.
+ * @param {Array<[number, number]>|maplibregl.LngLatBoundsLike} bounds
+ * @param {object} [opts]
+ */
 export function fitBounds(bounds, opts) {
   if (Array.isArray(bounds) && bounds.length && Array.isArray(bounds[0])) {
     const lngLatBounds = new maplibregl.LngLatBounds();
@@ -198,7 +237,11 @@ export function fitBounds(bounds, opts) {
   }
 }
 
+/** Zoom in one level (150ms ease). */
 export function zoomIn() { map.zoomTo(map.getZoom() + 1, {duration: 150}); }
+/** Zoom out one level (150ms ease). */
 export function zoomOut() { map.zoomTo(map.getZoom() - 1, {duration: 150}); }
+/** Close all popups previously registered via {@link trackPopup}. */
 export function closePopup() { popups.forEach(p => p.remove()); popups = []; }
+/** Register `popup` so a subsequent {@link clearMap} or {@link closePopup} can dismiss it. */
 export function trackPopup(popup) { popups.push(popup); }

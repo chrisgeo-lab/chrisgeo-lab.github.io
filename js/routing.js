@@ -1,5 +1,6 @@
 import { state, OSRM_PROFILES, STORE_CACHE, CACHE_MAX_ENTRIES, saveJSON } from './state.js';
 import { hd, showError } from './utils.js';
+import { SPEED_MPH } from './constants.js';
 
 function cacheKey(pts) { return `${state.travelMode}:${pts.map(p => `${p.lat.toFixed(5)},${p.lng.toFixed(5)}`).join('|')}`; }
 
@@ -15,10 +16,10 @@ function getProfile() {
   return OSRM_PROFILES[state.travelMode] || OSRM_PROFILES.car;
 }
 
-async function fetchWithRetry(url, retries = 1, delay = 1000) {
+async function fetchWithRetry(url, retries = 1, delay = 1000, timeoutMs = 5000) {
   for (let i = 0; i <= retries; i++) {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const r = await fetch(url, {signal: controller.signal});
       clearTimeout(timeout);
@@ -36,18 +37,26 @@ async function fetchWithRetry(url, retries = 1, delay = 1000) {
   }
 }
 
-async function fetchFromAnyServer(path) {
+async function fetchFromAnyServer(path, timeoutMs) {
   const profile = getProfile();
   const servers = [profile.primary, ...(profile.fallback ? [profile.fallback] : [])];
+  // /table requests with many points can exceed the default 5s; allow longer.
+  const t = timeoutMs != null ? timeoutMs : (path.startsWith('/table/') ? 20000 : 5000);
   for (const server of servers) {
     try {
-      return await fetchWithRetry(`${server}${path}`);
+      return await fetchWithRetry(`${server}${path}`, 1, 1000, t);
     } catch (e) {
       if (server === servers[servers.length - 1]) throw e;
     }
   }
 }
 
+/**
+ * Fetch an N×N OSRM duration matrix in seconds for the given points.
+ * Reads `state.travelMode` to pick the OSRM profile.
+ * @param {Spot[]} pts
+ * @returns {Promise<{durations: number[][]}>}
+ */
 export async function fetchTable(pts) {
   const c = pts.map(p => `${p.lng},${p.lat}`).join(';');
   const svc = getProfile().service;
@@ -97,6 +106,12 @@ async function fetchTableChunked(pts) {
   return {durations};
 }
 
+/**
+ * Fetch and cache a turn-by-turn OSRM route through the given waypoints.
+ * Reads/mutates `state.osrmCache`; persists to localStorage under STORE_CACHE.
+ * @param {Spot[]} pts
+ * @returns {Promise<Route>}
+ */
 export async function fetchRoute(pts) {
   const key = cacheKey(pts);
   if (state.osrmCache[key]) return state.osrmCache[key];
@@ -111,9 +126,14 @@ export async function fetchRoute(pts) {
   return d.routes[0];
 }
 
+/**
+ * Build an N×N straight-line duration matrix (seconds) using haversine + per-mode speed.
+ * Used as the offline fallback when OSRM /table fails. Reads `state.travelMode`.
+ * @param {Spot[]} pts
+ * @returns {number[][]}
+ */
 export function buildHaversineMatrix(pts) {
-  const speeds = {car: 25, bike: 10, walk: 3};
-  const speed = speeds[state.travelMode] || 25;
+  const speed = SPEED_MPH[state.travelMode] || SPEED_MPH.car;
   const n = pts.length;
   const m = Array.from({length: n}, () => new Array(n).fill(0));
   for (let i = 0; i < n; i++) {
@@ -124,6 +144,12 @@ export function buildHaversineMatrix(pts) {
   return m;
 }
 
+/**
+ * Get (and memoize on `state.durationMatrix`) the full N×N duration matrix for `state.SPOTS`.
+ * Falls back to haversine on OSRM failure and sets `state.matrixFallback = true`.
+ * @param {() => void} renderFn - Re-render hook used by the inline retry banner.
+ * @returns {Promise<number[][]>}
+ */
 export async function getFullDurationMatrix(renderFn) {
   if (state.durationMatrix) return state.durationMatrix;
   try {

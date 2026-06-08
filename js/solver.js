@@ -36,6 +36,13 @@ function kMedoids(n, k, distFn) {
   return assign;
 }
 
+/**
+ * Partition spot indices into k clusters via k-medoids over a symmetric duration metric.
+ * @param {number[]} indices  Indices into the full SPOTS array.
+ * @param {number} k          Cluster count (clamped: ≤1 → single cluster, ≥|indices| → singletons).
+ * @param {number[][]} matrix Full N×N duration matrix indexed by SPOTS index.
+ * @returns {number[][]}      Non-empty clusters of SPOTS indices.
+ */
 export function clusterUnvisited(indices, k, matrix) {
   if (k <= 1 || indices.length <= 1) return [indices];
   if (k >= indices.length) return indices.map(i => [i]);
@@ -53,6 +60,14 @@ function routeCost(route, matrix) {
   return c;
 }
 
+/**
+ * Heuristic TSP: nearest-neighbor seed, then 2-opt and or-opt (segment lengths 1–3) refinement.
+ * Pure — does not touch state. `startIdx` must appear in `indices`.
+ * @param {number[]} indices
+ * @param {number[][]} matrix
+ * @param {number} startIdx
+ * @returns {number[]}  Visit order beginning at `startIdx`.
+ */
 export function tspWithMatrix(indices, matrix, startIdx) {
   const n = indices.length;
   if (n <= 1) return [...indices];

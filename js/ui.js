@@ -27,8 +27,8 @@ export function renderView() {
   const lineWeight = routes.length === 1 ? 5 : 4;
   routes.forEach(rd => {
     if (rd.geometry?.coordinates) {
-      const ll = rd.geometry.coordinates.map(c => [c[1], c[0]]);
-      addPolyline(ll, rd.color, lineWeight);
+      // geometry.coordinates is GeoJSON [lng, lat] — pass through unchanged.
+      addPolyline(rd.geometry.coordinates, rd.color, lineWeight);
     }
     const spots = rd.route.map(i => typeof i === 'number' ? state.SPOTS[i] : i);
     const firstUnvisitedMap = spots.findIndex(s => !state.visitedSet.has((typeof s === 'number' ? state.SPOTS[s] : s).id));

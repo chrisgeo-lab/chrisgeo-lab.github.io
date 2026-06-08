@@ -1,40 +1,7 @@
 import { state } from './state.js';
-import { fitBounds } from './map.js';
+import { loadDemo, restoreFromDemo, isDemoActive } from './demo.js';
 
 const TOUR_KEY = 'routeflow-tour-complete';
-
-const DEMO_SPOTS = [
-  {id: 1, street: '1 Ferry Building', city: 'San Francisco', state: 'CA', zip: '94111', lat: 37.7955, lng: -122.3937},
-  {id: 2, street: '3251 20th Ave', city: 'San Francisco', state: 'CA', zip: '94132', lat: 37.7295, lng: -122.4780},
-  {id: 3, street: '501 Stanyan St', city: 'San Francisco', state: 'CA', zip: '94117', lat: 37.7694, lng: -122.4528},
-  {id: 4, street: '2 Marina Blvd', city: 'San Francisco', state: 'CA', zip: '94123', lat: 37.8066, lng: -122.4364},
-  {id: 5, street: '600 Montgomery St', city: 'San Francisco', state: 'CA', zip: '94111', lat: 37.7952, lng: -122.4028},
-  {id: 6, street: '55 Music Concourse Dr', city: 'San Francisco', state: 'CA', zip: '94118', lat: 37.7706, lng: -122.4669},
-  {id: 7, street: '1 Warriors Way', city: 'San Francisco', state: 'CA', zip: '94158', lat: 37.7680, lng: -122.3877},
-  {id: 8, street: '900 Innes Ave', city: 'San Francisco', state: 'CA', zip: '94124', lat: 37.7345, lng: -122.3720},
-  {id: 9, street: '2801 Leavenworth St', city: 'San Francisco', state: 'CA', zip: '94133', lat: 37.8070, lng: -122.4187},
-  {id: 10, street: '1 Sausalito Blvd', city: 'Sausalito', state: 'CA', zip: '94965', lat: 37.8590, lng: -122.4852},
-  {id: 11, street: '100 Shoreline Hwy', city: 'Mill Valley', state: 'CA', zip: '94941', lat: 37.8830, lng: -122.5270},
-  {id: 12, street: '501 Sir Francis Drake', city: 'San Anselmo', state: 'CA', zip: '94960', lat: 37.9746, lng: -122.5615},
-  {id: 13, street: '800 Point San Pedro Rd', city: 'San Rafael', state: 'CA', zip: '94901', lat: 37.9952, lng: -122.4530},
-  {id: 14, street: '2000 Larkspur Landing', city: 'Larkspur', state: 'CA', zip: '94939', lat: 37.9455, lng: -122.5090},
-  {id: 15, street: '400 Oyster Point Blvd', city: 'South San Francisco', state: 'CA', zip: '94080', lat: 37.6640, lng: -122.3975},
-  {id: 16, street: '1600 Bayshore Hwy', city: 'Burlingame', state: 'CA', zip: '94010', lat: 37.5930, lng: -122.3620},
-  {id: 17, street: '250 Hamilton Ave', city: 'Palo Alto', state: 'CA', zip: '94301', lat: 37.4430, lng: -122.1610},
-  {id: 18, street: '100 El Camino Real', city: 'Redwood City', state: 'CA', zip: '94063', lat: 37.4860, lng: -122.2280},
-  {id: 19, street: '3251 Hanover St', city: 'Palo Alto', state: 'CA', zip: '94304', lat: 37.4170, lng: -122.1450},
-  {id: 20, street: '1 Hacker Way', city: 'Menlo Park', state: 'CA', zip: '94025', lat: 37.4845, lng: -122.1477},
-  {id: 21, street: '1600 Amphitheatre Pkwy', city: 'Mountain View', state: 'CA', zip: '94043', lat: 37.4220, lng: -122.0841},
-  {id: 22, street: '1 Infinite Loop', city: 'Cupertino', state: 'CA', zip: '95014', lat: 37.3318, lng: -122.0312},
-  {id: 23, street: '2855 Stevens Creek Blvd', city: 'Santa Clara', state: 'CA', zip: '95050', lat: 37.3240, lng: -121.9490},
-  {id: 24, street: '200 Santa Row', city: 'San Jose', state: 'CA', zip: '95128', lat: 37.3210, lng: -121.9470},
-  {id: 25, street: '750 The Alameda', city: 'San Jose', state: 'CA', zip: '95126', lat: 37.3330, lng: -121.9060},
-  {id: 26, street: '5401 Bay St', city: 'Emeryville', state: 'CA', zip: '94608', lat: 37.8390, lng: -122.2960},
-  {id: 27, street: '1 Telegraph Ave', city: 'Oakland', state: 'CA', zip: '94612', lat: 37.8115, lng: -122.2730},
-  {id: 28, street: '6000 Shellmound St', city: 'Emeryville', state: 'CA', zip: '94608', lat: 37.8460, lng: -122.2930},
-  {id: 29, street: '1955 Broadway', city: 'Oakland', state: 'CA', zip: '94612', lat: 37.8120, lng: -122.2660},
-  {id: 30, street: '51 Moraga Way', city: 'Orinda', state: 'CA', zip: '94563', lat: 37.8780, lng: -122.1800}
-];
 
 const steps = [
   {
@@ -97,77 +64,46 @@ const steps = [
 
 let currentStep = 0;
 let tooltip = null;
+let backdrop = null;       // SVG overlay that dims the page with a punched hole
+let spotlight = null;      // pulsing ring around target
 let highlightedEl = null;
 let isActive = false;
-let savedSpots = null;
-let savedVisited = null;
-let savedNumClusters = 1;
-let savedStartPoint = null;
-let savedHome = null;
 let resizeHandler = null;
 let keyHandler = null;
+let scrollHandler = null;
 let renderCallback = null;
-
-function loadDemoData(renderFn) {
-  savedSpots = state.SPOTS.length ? [...state.SPOTS] : null;
-  savedVisited = new Set(state.visitedSet);
-  savedNumClusters = state.numClusters;
-  savedStartPoint = state.startPoint;
-  savedHome = state.home;
-  state.SPOTS = DEMO_SPOTS.map(s => ({...s}));
-  state.visitedSet = new Set([1, 5, 9, 15, 22]);
-  state.startPoint = {lat: DEMO_SPOTS[0].lat, lng: DEMO_SPOTS[0].lng, label: DEMO_SPOTS[0].street};
-  state.home = {lat: DEMO_SPOTS[29].lat, lng: DEMO_SPOTS[29].lng, label: DEMO_SPOTS[29].street};
-  state.durationMatrix = null;
-  state.currentRoutes = [];
-  state.numClusters = 3;
-  state.activeFilter = -1;
-  const slider = document.getElementById('clusterSlider');
-  if (slider) { slider.max = 10; slider.value = 3; }
-  const sliderVal = document.getElementById('clusterVal');
-  if (sliderVal) sliderVal.textContent = '3';
-  renderFn();
-  setTimeout(() => {
-    fitBounds(DEMO_SPOTS.map(s => [s.lat, s.lng]), {padding: [80, 80]});
-  }, 400);
-}
-
-function restoreData(renderFn) {
-  if (savedSpots !== null) {
-    state.SPOTS = savedSpots;
-    state.visitedSet = savedVisited;
-  } else {
-    state.SPOTS = [];
-    state.visitedSet = new Set();
-  }
-  state.durationMatrix = null;
-  state.currentRoutes = [];
-  state.numClusters = savedNumClusters;
-  state.startPoint = savedStartPoint;
-  state.home = savedHome;
-  const slider = document.getElementById('clusterSlider');
-  if (slider) { slider.value = savedNumClusters; }
-  const sliderVal = document.getElementById('clusterVal');
-  if (sliderVal) sliderVal.textContent = String(savedNumClusters);
-  savedSpots = null;
-  savedVisited = null;
-  savedStartPoint = null;
-  savedHome = null;
-  renderFn();
-}
+let pendingRaf = null;
 
 function clearHighlight() {
   if (highlightedEl) {
     highlightedEl.classList.remove('tour-highlight');
     highlightedEl = null;
   }
+  if (spotlight) {
+    spotlight.style.opacity = '0';
+  }
 }
 
 function destroy() {
   clearHighlight();
-  if (tooltip) { tooltip.remove(); tooltip = null; }
+  if (tooltip) {
+    tooltip.classList.remove('visible');
+    const t = tooltip; tooltip = null;
+    setTimeout(() => { try { t.remove(); } catch {} }, 220);
+  }
+  if (backdrop) {
+    backdrop.classList.remove('visible');
+    const b = backdrop; backdrop = null;
+    setTimeout(() => { try { b.remove(); } catch {} }, 240);
+  }
+  if (spotlight) {
+    const s = spotlight; spotlight = null;
+    setTimeout(() => { try { s.remove(); } catch {} }, 240);
+  }
   if (resizeHandler) { window.removeEventListener('resize', resizeHandler); resizeHandler = null; }
+  if (scrollHandler) { window.removeEventListener('scroll', scrollHandler, true); scrollHandler = null; }
   if (keyHandler) { document.removeEventListener('keydown', keyHandler); keyHandler = null; }
+  if (pendingRaf) { cancelAnimationFrame(pendingRaf); pendingRaf = null; }
   isActive = false;
 }
 
@@ -189,79 +125,144 @@ function goBack() {
 
 function complete() {
   destroy();
-  if (savedSpots !== null && renderCallback) restoreData(renderCallback);
+  if (isDemoActive() && renderCallback) restoreFromDemo(renderCallback);
   try { localStorage.setItem(TOUR_KEY, '1'); } catch {}
 }
 
-function positionTooltip(target, position) {
-  const tw = Math.min(320, window.innerWidth - 32);
+// Update the SVG mask so the dimmed backdrop has a "hole" cut out around
+// the highlighted target. When there's no target, fade to a flat dim.
+function updateBackdrop(rect) {
+  if (!backdrop) return;
+  const hole = backdrop.querySelector('.tour-backdrop-hole');
+  if (!hole) return;
+  if (!rect) {
+    hole.setAttribute('opacity', '0');
+    return;
+  }
+  const pad = 8;
+  const x = Math.max(0, rect.left - pad);
+  const y = Math.max(0, rect.top - pad);
+  const w = rect.width + pad * 2;
+  const h = rect.height + pad * 2;
+  const r = Math.min(14, Math.min(w, h) / 4);
+  hole.setAttribute('x', x);
+  hole.setAttribute('y', y);
+  hole.setAttribute('width', w);
+  hole.setAttribute('height', h);
+  hole.setAttribute('rx', r);
+  hole.setAttribute('ry', r);
+  hole.setAttribute('opacity', '1');
+}
+
+function updateSpotlight(rect) {
+  if (!spotlight) return;
+  if (!rect) { spotlight.style.opacity = '0'; return; }
+  const pad = 8;
+  spotlight.style.opacity = '1';
+  spotlight.style.left = (rect.left - pad) + 'px';
+  spotlight.style.top = (rect.top - pad) + 'px';
+  spotlight.style.width = (rect.width + pad * 2) + 'px';
+  spotlight.style.height = (rect.height + pad * 2) + 'px';
+}
+
+// Pick a position for the tooltip. Prefers given hint but flips when the
+// tooltip would clip off-screen on that side. Also returns the side actually
+// used so the caret can be drawn correctly.
+function placeTooltip(target, preferred) {
   const margin = 16;
+  const tw = Math.min(340, window.innerWidth - 32);
   tooltip.style.width = tw + 'px';
 
-  if (!target || position === 'center') {
+  if (!target || preferred === 'center') {
     tooltip.classList.add('tour-center');
     tooltip.style.top = '';
     tooltip.style.left = '';
     tooltip.style.bottom = '';
     tooltip.style.right = '';
-    return;
+    tooltip.dataset.side = 'center';
+    return 'center';
+  }
+  tooltip.classList.remove('tour-center');
+
+  const rect = target.getBoundingClientRect();
+  const th = tooltip.offsetHeight || 220;
+  const vw = window.innerWidth, vh = window.innerHeight;
+
+  // Decide which side has room. Order of preference: requested side first,
+  // then the side with the most space.
+  const space = {
+    top: rect.top - margin,
+    bottom: vh - rect.bottom - margin,
+    left: rect.left - margin,
+    right: vw - rect.right - margin
+  };
+  const fits = {
+    top: space.top >= th,
+    bottom: space.bottom >= th,
+    left: space.left >= tw,
+    right: space.right >= tw
+  };
+  let side = preferred;
+  if (!fits[side]) {
+    const order = ['bottom', 'top', 'right', 'left'];
+    side = order.find(s => fits[s]) || preferred;
   }
 
-  tooltip.classList.remove('tour-center');
-  const rect = target.getBoundingClientRect();
-  const th = tooltip.offsetHeight || 200;
-
-  let top = '', left = '';
-
-  switch (position) {
-    case 'left': {
-      top = Math.max(margin, Math.min(rect.top, window.innerHeight - th - margin));
+  let top, left;
+  switch (side) {
+    case 'left':
+      top = clamp(rect.top + rect.height / 2 - th / 2, margin, vh - th - margin);
       left = rect.left - tw - margin;
-      if (left < margin) {
-        left = margin;
-        top = rect.bottom + margin;
-      }
       break;
-    }
-    case 'right': {
-      top = Math.max(margin, Math.min(rect.top, window.innerHeight - th - margin));
+    case 'right':
+      top = clamp(rect.top + rect.height / 2 - th / 2, margin, vh - th - margin);
       left = rect.right + margin;
-      if (left + tw > window.innerWidth - margin) {
-        left = margin;
-        top = rect.bottom + margin;
-      }
       break;
-    }
-    case 'top': {
-      left = Math.max(margin, Math.min(rect.left, window.innerWidth - tw - margin));
-      const bottomVal = window.innerHeight - rect.top + margin;
-      tooltip.style.top = '';
-      tooltip.style.left = left + 'px';
-      tooltip.style.bottom = bottomVal + 'px';
-      tooltip.style.right = '';
-      return;
-    }
+    case 'top':
+      top = rect.top - th - margin;
+      left = clamp(rect.left + rect.width / 2 - tw / 2, margin, vw - tw - margin);
+      break;
     case 'bottom':
-    default: {
+    default:
       top = rect.bottom + margin;
-      left = Math.max(margin, Math.min(rect.left, window.innerWidth - tw - margin));
+      left = clamp(rect.left + rect.width / 2 - tw / 2, margin, vw - tw - margin);
+      side = 'bottom';
       break;
-    }
   }
 
   tooltip.style.top = top + 'px';
   tooltip.style.left = left + 'px';
   tooltip.style.bottom = '';
   tooltip.style.right = '';
+  tooltip.dataset.side = side;
+
+  // Position the caret to point at the target's center along the relevant edge.
+  const caret = tooltip.querySelector('.tour-caret');
+  if (caret) {
+    if (side === 'top' || side === 'bottom') {
+      const cx = clamp(rect.left + rect.width / 2 - left, 24, tw - 24);
+      caret.style.left = cx + 'px';
+      caret.style.top = '';
+    } else if (side === 'left' || side === 'right') {
+      const cy = clamp(rect.top + rect.height / 2 - top, 24, th - 24);
+      caret.style.top = cy + 'px';
+      caret.style.left = '';
+    }
+  }
+
+  return side;
 }
+
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
 function showStep() {
   const step = steps[currentStep];
   const target = step.target ? step.target() : null;
+  const visible = !!(target && target.offsetParent !== null && target.getBoundingClientRect().width > 0);
   const position = typeof step.position === 'function' ? step.position() : step.position;
 
   clearHighlight();
-  if (target && target.offsetParent !== null) {
+  if (visible) {
     target.classList.add('tour-highlight');
     highlightedEl = target;
   }
@@ -270,27 +271,99 @@ function showStep() {
   const isLast = currentStep === steps.length - 1;
   const progress = ((currentStep + 1) / steps.length) * 100;
 
+  // Build progress dots
+  const dots = steps.map((_, i) => {
+    const cls = i < currentStep ? 'done' : (i === currentStep ? 'active' : '');
+    return `<span class="tour-dot ${cls}" data-step="${i}" aria-label="Step ${i + 1}"></span>`;
+  }).join('');
+
   tooltip.innerHTML = `
+    <button class="tour-close" aria-label="Close tour">&times;</button>
+    <div class="tour-caret" aria-hidden="true"></div>
     <div class="tour-progress"><div class="tour-progress-fill" style="width:${progress}%"></div></div>
     <div class="tour-tooltip-title">${step.title}</div>
     <div class="tour-tooltip-body">${step.body}</div>
     <div class="tour-tooltip-footer">
-      <div class="tour-step-count">${currentStep + 1} / ${steps.length}</div>
+      <div class="tour-dots" role="tablist">${dots}</div>
       <div class="tour-actions">
-        ${isFirst ? `<button class="tour-btn tour-btn-skip">Skip Tour</button>` : `<button class="tour-btn tour-btn-back">&larr; Back</button>`}
-        <button class="tour-btn tour-btn-next">${isLast ? 'Finish' : 'Next &rarr;'}</button>
+        ${isFirst
+          ? `<button class="tour-btn tour-btn-skip">Skip</button>`
+          : `<button class="tour-btn tour-btn-back">Back</button>`}
+        <button class="tour-btn tour-btn-next">${isLast ? 'Finish' : 'Next'}</button>
       </div>
     </div>`;
 
   tooltip.querySelector('.tour-btn-next').onclick = advance;
+  tooltip.querySelector('.tour-close').onclick = complete;
   if (isFirst) tooltip.querySelector('.tour-btn-skip').onclick = complete;
   else tooltip.querySelector('.tour-btn-back').onclick = goBack;
-
-  tooltip.className = 'tour-tooltip';
-  requestAnimationFrame(() => {
-    tooltip.classList.add('visible');
-    positionTooltip(target, position);
+  // Click any dot to jump
+  tooltip.querySelectorAll('.tour-dot').forEach(d => {
+    d.onclick = () => {
+      const idx = parseInt(d.dataset.step, 10);
+      if (Number.isFinite(idx) && idx !== currentStep) {
+        currentStep = idx;
+        showStep();
+      }
+    };
   });
+
+  // Trigger fade-out then re-position then fade-in for a smooth transition.
+  // Using rAF chains so the layout settles before measuring offsetHeight.
+  tooltip.classList.remove('visible');
+  if (pendingRaf) cancelAnimationFrame(pendingRaf);
+  pendingRaf = requestAnimationFrame(() => {
+    pendingRaf = requestAnimationFrame(() => {
+      const rect = visible ? target.getBoundingClientRect() : null;
+      updateBackdrop(rect);
+      updateSpotlight(rect);
+      placeTooltip(visible ? target : null, position);
+      tooltip.classList.add('visible');
+    });
+  });
+}
+
+function buildBackdrop() {
+  // Full-viewport SVG with a black mask. White pixels in the mask are kept
+  // (dimmed area); the rect inside the mask is black, which "punches" a
+  // transparent hole around the highlighted target.
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNS, 'svg');
+  svg.setAttribute('class', 'tour-backdrop');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.setAttribute('preserveAspectRatio', 'none');
+
+  const defs = document.createElementNS(svgNS, 'defs');
+  const mask = document.createElementNS(svgNS, 'mask');
+  mask.setAttribute('id', 'tour-backdrop-mask');
+  const fullRect = document.createElementNS(svgNS, 'rect');
+  fullRect.setAttribute('x', '0'); fullRect.setAttribute('y', '0');
+  fullRect.setAttribute('width', '100%'); fullRect.setAttribute('height', '100%');
+  fullRect.setAttribute('fill', 'white');
+  const hole = document.createElementNS(svgNS, 'rect');
+  hole.setAttribute('class', 'tour-backdrop-hole');
+  hole.setAttribute('fill', 'black');
+  hole.setAttribute('rx', '12'); hole.setAttribute('ry', '12');
+  hole.setAttribute('opacity', '0');
+  mask.appendChild(fullRect);
+  mask.appendChild(hole);
+  defs.appendChild(mask);
+  svg.appendChild(defs);
+
+  const dim = document.createElementNS(svgNS, 'rect');
+  dim.setAttribute('x', '0'); dim.setAttribute('y', '0');
+  dim.setAttribute('width', '100%'); dim.setAttribute('height', '100%');
+  dim.setAttribute('fill', 'rgba(0,0,0,0.45)');
+  dim.setAttribute('mask', 'url(#tour-backdrop-mask)');
+  svg.appendChild(dim);
+  return svg;
+}
+
+function buildSpotlight() {
+  const el = document.createElement('div');
+  el.className = 'tour-spotlight';
+  el.setAttribute('aria-hidden', 'true');
+  return el;
 }
 
 export function startTour(renderFn) {
@@ -299,13 +372,26 @@ export function startTour(renderFn) {
   currentStep = 0;
   renderCallback = renderFn || null;
 
+  backdrop = buildBackdrop();
+  document.body.appendChild(backdrop);
+
+  spotlight = buildSpotlight();
+  document.body.appendChild(spotlight);
+
   tooltip = document.createElement('div');
   tooltip.className = 'tour-tooltip';
+  tooltip.setAttribute('role', 'dialog');
+  tooltip.setAttribute('aria-live', 'polite');
   document.body.appendChild(tooltip);
 
+  // Fade backdrop in
+  requestAnimationFrame(() => backdrop && backdrop.classList.add('visible'));
+
   if (renderFn) {
-    loadDemoData(renderFn);
-    setTimeout(() => showStep(), 800);
+    loadDemo(renderFn);
+    // Wait for one paint so the empty-state UI hides and target elements
+    // (manageStopsBtn, travelModeBar, etc.) are in their populated layout.
+    requestAnimationFrame(() => requestAnimationFrame(showStep));
   } else {
     showStep();
   }
@@ -319,8 +405,28 @@ export function startTour(renderFn) {
   document.addEventListener('keydown', keyHandler);
 
   let resizeTimer = null;
-  resizeHandler = () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { if (isActive) showStep(); }, 150); };
+  resizeHandler = () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => { if (isActive) showStep(); }, 120);
+  };
   window.addEventListener('resize', resizeHandler);
+
+  // Reposition on scroll (e.g. bottom sheet) so the spotlight tracks the target.
+  let scrollRaf = null;
+  scrollHandler = () => {
+    if (!isActive || !highlightedEl) return;
+    if (scrollRaf) return;
+    scrollRaf = requestAnimationFrame(() => {
+      scrollRaf = null;
+      const rect = highlightedEl.getBoundingClientRect();
+      updateBackdrop(rect);
+      updateSpotlight(rect);
+      const pos = typeof steps[currentStep].position === 'function'
+        ? steps[currentStep].position() : steps[currentStep].position;
+      placeTooltip(highlightedEl, pos);
+    });
+  };
+  window.addEventListener('scroll', scrollHandler, true);
 }
 
 export function shouldShowTour() {

@@ -4,17 +4,35 @@ import { fetchTable, fetchRoute, buildHaversineMatrix, getFullDurationMatrix } f
 import { clusterUnvisited, tspWithMatrix } from './solver.js';
 import { renderView } from './ui.js';
 
+function syntheticRoute(orderedIndices, color, name, waypoints) {
+  const coords = waypoints.map(p => [p.lng, p.lat]);
+  let totalDist = 0;
+  for (let i = 0; i < waypoints.length - 1; i++) totalDist += hd(waypoints[i], waypoints[i + 1]);
+  return {
+    route: orderedIndices, color, name,
+    geometry: {type: 'LineString', coordinates: coords},
+    legs: null,
+    totalMiles: totalDist,
+    totalMinutes: (totalDist / 25) * 60
+  };
+}
+
 async function solveRoute(spotIndices, color, name, matrix) {
   let orderedIndices;
   const origin = getStartLocation();
   const anchor = origin || state.home;
+  const offline = state.demoMode || state.matrixFallback;
 
   try {
     if (anchor) {
       const pts = [anchor, ...spotIndices.map(i => state.SPOTS[i])];
       let localMatrix;
-      try { const tbl = await fetchTable(pts); localMatrix = tbl.durations; }
-      catch { localMatrix = buildHaversineMatrix(pts); }
+      if (offline) {
+        localMatrix = buildHaversineMatrix(pts);
+      } else {
+        try { const tbl = await fetchTable(pts); localMatrix = tbl.durations; }
+        catch { localMatrix = buildHaversineMatrix(pts); }
+      }
       const n = pts.length;
       const order = tspWithMatrix([...Array(n).keys()], localMatrix, 0);
       orderedIndices = order.filter(i => i !== 0).map(i => spotIndices[i - 1]);
@@ -27,18 +45,22 @@ async function solveRoute(spotIndices, color, name, matrix) {
 
   const waypoints = [...(origin ? [origin] : []), ...orderedIndices.map(i => state.SPOTS[i]), ...(state.home ? [state.home] : [])];
 
-  let routeResult;
-  try {
-    routeResult = await fetchRoute(waypoints);
-  } catch {
-    const coords = waypoints.map(p => [p.lng, p.lat]);
-    let totalDist = 0; for (let i = 0; i < waypoints.length - 1; i++) totalDist += hd(waypoints[i], waypoints[i + 1]);
-    return {route: orderedIndices, color, name, geometry: {type: 'LineString', coordinates: coords}, legs: null, totalMiles: totalDist, totalMinutes: (totalDist / 25) * 60};
-  }
+  if (offline) return syntheticRoute(orderedIndices, color, name, waypoints);
 
-  return {route: orderedIndices, color, name, geometry: routeResult.geometry, legs: routeResult.legs, totalMiles: routeResult.distance * 0.000621371, totalMinutes: routeResult.duration / 60};
+  try {
+    const routeResult = await fetchRoute(waypoints);
+    return {route: orderedIndices, color, name, geometry: routeResult.geometry, legs: routeResult.legs, totalMiles: routeResult.distance * 0.000621371, totalMinutes: routeResult.duration / 60};
+  } catch {
+    return syntheticRoute(orderedIndices, color, name, waypoints);
+  }
 }
 
+/**
+ * Top-level routing pipeline. Reads SPOTS/visitedSet/start/home/numClusters from state,
+ * writes state.currentRoutes (and may reset state.activeFilter), then triggers UI render.
+ * Re-entrant — uses `state.renderVer` to drop stale results.
+ * @returns {Promise<void>}
+ */
 export async function render() {
   const ver = ++state.renderVer;
   if (!state.SPOTS.length) {
