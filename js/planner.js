@@ -66,6 +66,14 @@ export async function render() {
   if (!state.SPOTS.length) {
     state.currentRoutes = []; renderView(); return;
   }
+  // Drop anchor spotId references that no longer point at a valid SPOTS entry
+  // (e.g. after a Replace import). Keeps the lat/lng so the marker still renders.
+  if (state.startPoint && state.startPoint.spotId != null && !state.SPOTS[state.startPoint.spotId]) {
+    state.startPoint = {...state.startPoint, spotId: null};
+  }
+  if (state.home && state.home.spotId != null && !state.SPOTS[state.home.spotId]) {
+    state.home = {...state.home, spotId: null};
+  }
   const excludedSpotIds = new Set();
   if (state.startPoint && state.startPoint.spotId != null) excludedSpotIds.add(state.startPoint.spotId);
   if (state.home && state.home.spotId != null) excludedSpotIds.add(state.home.spotId);
@@ -97,8 +105,9 @@ export async function render() {
   } catch (e) {
     console.error('Routing failed:', e);
     state.currentRoutes = [];
-    renderView();
-    showError('Route calculation failed', () => { state.durationMatrix = null; render(); });
+    try { renderView(); } catch (rv) { console.error('renderView failed:', rv); }
+    const detail = e && e.message ? ` — ${e.message}` : '';
+    showError(`Route calculation failed${detail}`, () => { state.durationMatrix = null; render(); });
   } finally {
     if (ver === state.renderVer) setLoading(false);
   }

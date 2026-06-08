@@ -361,6 +361,10 @@ function applyValidStops(valid) {
     state.SPOTS = newSpots;
     saveJSON(STORE_SPOTS, state.SPOTS);
     state.visitedSet.clear(); saveSet(STORE_V, state.visitedSet);
+    // Stale start/end anchors from the previous dataset would dangle here;
+    // clear them rather than carrying mismatched coordinates onto the new map.
+    state.startPoint = null; localStorage.removeItem('routeflow-start');
+    state.home = null; localStorage.removeItem('routeflow-home');
     resetRouteState();
     state.numClusters = 1; state.activeFilter = -1;
     document.getElementById('clusterSlider').value = 1;

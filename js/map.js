@@ -1,7 +1,14 @@
 const darkQuery = window.matchMedia('(prefers-color-scheme:dark)');
 
-function getStyle(isDark) {
-  return isDark
+function isDark() {
+  const override = document.documentElement.getAttribute('data-theme');
+  if (override === 'dark') return true;
+  if (override === 'light') return false;
+  return darkQuery.matches;
+}
+
+function getStyle(dark) {
+  return dark
     ? 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json'
     : 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json';
 }
@@ -9,7 +16,7 @@ function getStyle(isDark) {
 /** Singleton MapLibre instance for the app. */
 export const map = new maplibregl.Map({
   container: 'map',
-  style: getStyle(darkQuery.matches),
+  style: getStyle(isDark()),
   center: [-71.18, 42.5],
   zoom: 9,
   pitch: 0,
@@ -31,8 +38,9 @@ export const mapReady = new Promise(resolve => {
   map.once('load', () => { mapLoaded = true; resolve(); });
 });
 
-darkQuery.addEventListener('change', e => {
-  map.setStyle(getStyle(e.matches));
+darkQuery.addEventListener('change', () => {
+  if (document.documentElement.hasAttribute('data-theme')) return;
+  map.setStyle(getStyle(isDark()));
   map.once('style.load', () => restoreLayers());
 });
 
@@ -63,7 +71,7 @@ function add3DBuildings() {
     type: 'fill-extrusion',
     minzoom: 14,
     paint: {
-      'fill-extrusion-color': darkQuery.matches ? '#2c2c2e' : '#ddd',
+      'fill-extrusion-color': isDark() ? '#2c2c2e' : '#ddd',
       'fill-extrusion-height': ['case', ['has', 'render_height'], ['get', 'render_height'], ['has', 'floors'], ['*', ['get', 'floors'], 3.5], 10],
       'fill-extrusion-base': ['case', ['has', 'render_min_height'], ['get', 'render_min_height'], 0],
       'fill-extrusion-opacity': 0.6

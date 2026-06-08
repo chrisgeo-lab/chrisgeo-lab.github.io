@@ -1,4 +1,4 @@
-import { state, STOP_MIN, STORE_V, STORE_SPOTS, saveSet, getStartLocation, getActiveRoutes } from './state.js';
+import { state, STOP_MIN, STORE_V, saveSet, getStartLocation, getActiveRoutes } from './state.js';
 import { esc, fmtMi, fmtTime, fmtDur, toast } from './utils.js';
 import { map, clearMap, addMarker, addPolyline, stopIcon, homeIcon, gpsIcon, trackPopup, setView, fitBounds, closePopup } from './map.js';
 export { render } from './planner.js';
@@ -152,7 +152,7 @@ function renderStats() {
   const modeLabels = {car: 'Drive', bike: 'Bike', walk: 'Walk'};
   const timeLabel = document.querySelector('#routeSummary .route-stat:nth-child(2) .route-stat-label');
   if (timeLabel) timeLabel.textContent = modeLabels[state.travelMode] || 'Drive';
-  const endLabel = state.home ? ` &middot; &#8594; ${esc(state.home.label.split(',')[0])}` : '';
+  const endLabel = state.home ? ` &middot; &#8594; ${esc((state.home.label || 'End').split(',')[0])}` : '';
   document.getElementById('topSubtitle').innerHTML = `${done}/${totalStops} stops &middot; ${totalMi.toFixed(1)} mi${endLabel}`;
 }
 
@@ -291,8 +291,7 @@ function updateStopsInfo() {
   const text = document.getElementById('stopsInfoText');
   if (!state.SPOTS.length) { badge.style.display = 'none'; return; }
   badge.style.display = 'flex';
-  const isCustom = localStorage.getItem(STORE_SPOTS) !== null;
-  text.textContent = `${state.SPOTS.length} stop${state.SPOTS.length !== 1 ? 's' : ''}${isCustom ? ' (imported)' : ''}`;
+  text.textContent = `${state.SPOTS.length} stop${state.SPOTS.length !== 1 ? 's' : ''}`;
 }
 
 function updateEmptyState() {

@@ -3,12 +3,14 @@ import { initBootstrap } from './bootstrap.js';
 import { initWiring } from './wiring.js';
 import { initSheet } from './sheet.js';
 import { initGeolocation } from './geolocation.js';
+import { initTheme } from './theme.js';
 import { startTour, shouldShowTour, resetTour } from './tour.js';
 import { TOUR_AUTOSTART_DELAY_MS } from './constants.js';
 
 initBootstrap();
 initWiring();
 initSheet();
+initTheme();
 initGeolocation(render);
 render();
 

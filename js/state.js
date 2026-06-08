@@ -164,5 +164,6 @@ export const state = {
   matrixFallback: false,
   demoMode: false,
   sheetState: 'peek',
-  travelMode: loadJSON('routeflow-travel-mode') || 'car'
+  travelMode: loadJSON('routeflow-travel-mode') || 'car',
+  gpsState: 'unknown' // 'unknown' | 'granted' | 'denied' | 'unavailable'
 };
