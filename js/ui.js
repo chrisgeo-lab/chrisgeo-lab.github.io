@@ -6,6 +6,7 @@ export { render } from './planner.js';
 let gpsMarker = null;
 
 function bindPopup(marker, html) {
+  if (!marker || marker._invalid) return;
   const el = marker._el || marker.getElement();
   if (!el) return;
   el.addEventListener('click', e => {
@@ -29,13 +30,18 @@ export function renderView() {
   // see something while routing is loading or after a routing failure.
   if (!routes.length && state.SPOTS.length) {
     state.SPOTS.forEach((spot, i) => {
-      if (state.visitedSet.has(spot.id) && !state.showVisitedMarkers) return;
-      const visited = state.visitedSet.has(spot.id);
-      const mk = addMarker(spot.lat, spot.lng, stopIcon(i + 1, '#007AFF', visited, false));
-      const addr = [spot.city, spot.state, spot.zip].filter(Boolean).join(', ');
-      const popup = `<div class="stop-popup"><div class="stop-popup-label" style="color:#007AFF">Stop ${i + 1}</div><div class="stop-popup-street">${esc(spot.street || '')}</div>${addr ? `<div class="stop-popup-addr">${esc(addr)}</div>` : ''}<button class="stop-popup-btn stop-popup-btn-visit" data-visit-id="${spot.id}">&#10003; Mark Visited</button></div>`;
-      bindPopup(mk, popup);
-      bounds.push([spot.lat, spot.lng]);
+      try {
+        if (state.visitedSet.has(spot.id) && !state.showVisitedMarkers) return;
+        if (!Number.isFinite(spot.lat) || !Number.isFinite(spot.lng)) return;
+        const visited = state.visitedSet.has(spot.id);
+        const mk = addMarker(spot.lat, spot.lng, stopIcon(i + 1, '#007AFF', visited, false));
+        const addr = [spot.city, spot.state, spot.zip].filter(Boolean).join(', ');
+        const popup = `<div class="stop-popup"><div class="stop-popup-label" style="color:#007AFF">Stop ${i + 1}</div><div class="stop-popup-street">${esc(spot.street || '')}</div>${addr ? `<div class="stop-popup-addr">${esc(addr)}</div>` : ''}<button class="stop-popup-btn stop-popup-btn-visit" data-visit-id="${spot.id}">&#10003; Mark Visited</button></div>`;
+        bindPopup(mk, popup);
+        bounds.push([spot.lat, spot.lng]);
+      } catch (err) {
+        console.warn('renderView: skipped stop', i, err);
+      }
     });
   }
   routes.forEach(rd => {
@@ -46,42 +52,51 @@ export function renderView() {
     const spots = rd.route.map(i => typeof i === 'number' ? state.SPOTS[i] : i);
     const firstUnvisitedMap = spots.findIndex(s => !state.visitedSet.has((typeof s === 'number' ? state.SPOTS[s] : s).id));
     spots.forEach((s, i) => {
-      const spot = typeof s === 'number' ? state.SPOTS[s] : s;
-      const sid = spot.id;
-      routeSpotIds.add(sid);
-      const curr = i === firstUnvisitedMap || (firstUnvisitedMap === -1 && i === 0);
-      const mk = addMarker(spot.lat, spot.lng, stopIcon(i + 1, rd.color, false, curr));
-      const legOffset = getStartLocation() ? 1 : 0;
-      const legInfo = rd.legs && rd.legs[legOffset + i];
-      const addr = [spot.city, spot.state, spot.zip].filter(Boolean).join(', ');
-      let popup = `<div class="stop-popup"><div class="stop-popup-label" style="color:${rd.color}">Stop ${i + 1}</div><div class="stop-popup-street">${esc(spot.street)}</div>${addr ? `<div class="stop-popup-addr">${esc(addr)}</div>` : ''}`;
-      if (legInfo) popup += `<div class="stop-popup-leg">${fmtMi(legInfo.distance)} mi · ${fmtDur(legInfo.duration)} from ${i === 0 ? 'start' : 'prev'}</div>`;
-      popup += `<button class="stop-popup-btn stop-popup-btn-visit" data-visit-id="${sid}">&#10003; Mark Visited</button></div>`;
-      bindPopup(mk, popup);
-      bounds.push([spot.lat, spot.lng]);
+      try {
+        const spot = typeof s === 'number' ? state.SPOTS[s] : s;
+        if (!spot || !Number.isFinite(spot.lat) || !Number.isFinite(spot.lng)) return;
+        const sid = spot.id;
+        routeSpotIds.add(sid);
+        const curr = i === firstUnvisitedMap || (firstUnvisitedMap === -1 && i === 0);
+        const mk = addMarker(spot.lat, spot.lng, stopIcon(i + 1, rd.color, false, curr));
+        const legOffset = getStartLocation() ? 1 : 0;
+        const legInfo = rd.legs && rd.legs[legOffset + i];
+        const addr = [spot.city, spot.state, spot.zip].filter(Boolean).join(', ');
+        let popup = `<div class="stop-popup"><div class="stop-popup-label" style="color:${rd.color}">Stop ${i + 1}</div><div class="stop-popup-street">${esc(spot.street)}</div>${addr ? `<div class="stop-popup-addr">${esc(addr)}</div>` : ''}`;
+        if (legInfo) popup += `<div class="stop-popup-leg">${fmtMi(legInfo.distance)} mi · ${fmtDur(legInfo.duration)} from ${i === 0 ? 'start' : 'prev'}</div>`;
+        popup += `<button class="stop-popup-btn stop-popup-btn-visit" data-visit-id="${sid}">&#10003; Mark Visited</button></div>`;
+        bindPopup(mk, popup);
+        bounds.push([spot.lat, spot.lng]);
+      } catch (err) {
+        console.warn('renderView: skipped routed stop', i, err);
+      }
     });
   });
   if (state.showVisitedMarkers) {
-    state.SPOTS.filter(s => state.visitedSet.has(s.id) && !routeSpotIds.has(s.id)).forEach(spot => {
-      const mk = addMarker(spot.lat, spot.lng, stopIcon('&#10003;', '#aeaeb2', true, false));
-      const addr = [spot.city, spot.state, spot.zip].filter(Boolean).join(', ');
-      let popup = `<div class="stop-popup"><div class="stop-popup-label" style="color:#aeaeb2">Visited</div><div class="stop-popup-street">${esc(spot.street)}</div>${addr ? `<div class="stop-popup-addr">${esc(addr)}</div>` : ''}`;
-      popup += `<button class="stop-popup-btn stop-popup-btn-unvisit" data-visit-id="${spot.id}">Mark Unvisited</button></div>`;
-      bindPopup(mk, popup);
+    state.SPOTS.filter(s => state.visitedSet.has(s.id) && !routeSpotIds.has(s.id) && Number.isFinite(s.lat) && Number.isFinite(s.lng)).forEach(spot => {
+      try {
+        const mk = addMarker(spot.lat, spot.lng, stopIcon('&#10003;', '#aeaeb2', true, false));
+        const addr = [spot.city, spot.state, spot.zip].filter(Boolean).join(', ');
+        let popup = `<div class="stop-popup"><div class="stop-popup-label" style="color:#aeaeb2">Visited</div><div class="stop-popup-street">${esc(spot.street)}</div>${addr ? `<div class="stop-popup-addr">${esc(addr)}</div>` : ''}`;
+        popup += `<button class="stop-popup-btn stop-popup-btn-unvisit" data-visit-id="${spot.id}">Mark Unvisited</button></div>`;
+        bindPopup(mk, popup);
+      } catch (err) {
+        console.warn('renderView: skipped visited marker', err);
+      }
     });
   }
-  if (state.home) {
+  if (state.home && Number.isFinite(state.home.lat) && Number.isFinite(state.home.lng)) {
     const mk = addMarker(state.home.lat, state.home.lng, homeIcon());
     bindPopup(mk, `<div class="stop-popup"><div class="stop-popup-label" style="color:#FF9500">End Point</div><div class="stop-popup-street">${esc(state.home.label)}</div></div>`);
     bounds.push([state.home.lat, state.home.lng]);
   }
-  if (state.startPoint) {
+  if (state.startPoint && Number.isFinite(state.startPoint.lat) && Number.isFinite(state.startPoint.lng)) {
     const mk = addMarker(state.startPoint.lat, state.startPoint.lng, {html: '<div style="width:20px;height:20px;background:#007AFF;border:2px solid #fff;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff">&#9654;</div>'});
     bindPopup(mk, `<div class="stop-popup"><div class="stop-popup-label" style="color:#007AFF">Start Point</div><div class="stop-popup-street">${esc(state.startPoint.label)}</div></div>`);
     bounds.push([state.startPoint.lat, state.startPoint.lng]);
   }
   if (gpsMarker) { gpsMarker.remove(); gpsMarker = null; }
-  if (state.gpsPos) {
+  if (state.gpsPos && Number.isFinite(state.gpsPos.lat) && Number.isFinite(state.gpsPos.lng)) {
     gpsMarker = addMarker(state.gpsPos.lat, state.gpsPos.lng, gpsIcon());
   }
   if (bounds.length && !state.suppressFitBounds) {
@@ -347,11 +362,13 @@ function updateEmptyState() {
 
 export function computeMaxClusters() {
   const n = state.SPOTS.length;
+  if (n < 2) return 1;
   const MIN_PER_CLUSTER = 3;
-  const maxBySize = Math.floor(n / MIN_PER_CLUSTER);
-  const cities = new Set(state.SPOTS.map(s => s.city));
-  const maxByCities = cities.size;
-  return Math.max(2, Math.min(maxBySize, maxByCities));
+  const maxBySize = Math.max(1, Math.floor(n / MIN_PER_CLUSTER));
+  const cities = new Set(state.SPOTS.map(s => s.city).filter(Boolean));
+  const maxByCities = Math.max(1, cities.size);
+  // Cap at the number of stops (k can't exceed n) and at least 1.
+  return Math.max(1, Math.min(n, maxBySize, maxByCities));
 }
 
 export function setSheetState(s) {

@@ -107,6 +107,12 @@ export function clearMap() {
  * @returns {maplibregl.Marker}
  */
 export function addMarker(lat, lng, icon) {
+  // Guard MapLibre against NaN/undefined coords — one bad spot would otherwise
+  // throw "LngLat is not defined" and abort the whole render loop.
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+    console.warn('addMarker: invalid lat/lng', lat, lng);
+    return { _invalid: true, getLngLat: () => null, getElement: () => null, remove() {}, _el: null, _lngLat: null };
+  }
   const el = document.createElement('div');
   el.innerHTML = icon.html;
   el.style.cursor = 'pointer';
@@ -227,7 +233,21 @@ export function setView(latlng, zoom, opts) {
 export function fitBounds(bounds, opts) {
   if (Array.isArray(bounds) && bounds.length && Array.isArray(bounds[0])) {
     const lngLatBounds = new maplibregl.LngLatBounds();
-    bounds.forEach(b => lngLatBounds.extend([b[1], b[0]]));
+    let added = 0;
+    bounds.forEach(b => {
+      if (!Number.isFinite(b[0]) || !Number.isFinite(b[1]) || Math.abs(b[0]) > 90 || Math.abs(b[1]) > 180) return;
+      lngLatBounds.extend([b[1], b[0]]);
+      added++;
+    });
+    if (!added) return;
+    // Single point → fitBounds would zoom to maxZoom and feel like a freeze.
+    // Centre on that point at a sensible zoom instead.
+    if (added === 1) {
+      const c = lngLatBounds.getCenter();
+      map.stop();
+      map.jumpTo({center: [c.lng, c.lat], zoom: 14});
+      return;
+    }
     const padding = {};
     if (opts) {
       if (opts.padding) {

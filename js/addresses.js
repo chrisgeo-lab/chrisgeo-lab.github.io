@@ -152,7 +152,7 @@ function importAddresses(addresses) {
     zip: a.zip || '',
     lat: a.lat,
     lng: a.lng,
-    status: a.lat && a.lng ? 'ok' : 'pending'
+    status: Number.isFinite(a.lat) && Number.isFinite(a.lng) ? 'ok' : 'pending'
   }));
   renderAddrPreview();
   toast(`${stagedAddresses.length} addresses loaded`);
@@ -482,7 +482,7 @@ export async function confirmAddresses() {
   btn.textContent = 'Resolving...'; btn.disabled = true;
   await geocodeStaged();
   btn.textContent = 'Apply Stops'; btn.disabled = false;
-  const valid = stagedAddresses.filter(a => a.status === 'ok');
+  const valid = stagedAddresses.filter(a => a.status === 'ok' && Number.isFinite(a.lat) && Number.isFinite(a.lng));
   if (!valid.length) { renderAddrPreview(); return; }
   applyValidStops(valid);
 }

@@ -87,24 +87,26 @@ export function loadJSON(k) {
 }
 /** Persist a Set as a JSON array under `k`. */
 export function saveSet(k, s) { saveJSON(k, [...s]); }
-/** Persist `v` as JSON under `k`. On QuotaExceeded evicts half of `state.osrmCache` and retries once. */
+let storageFullToasted = false;
+/** Persist `v` as JSON under `k`. On QuotaExceeded drops the entire OSRM cache and retries once. */
 export function saveJSON(k, v) {
   try { localStorage.setItem(k, JSON.stringify(v)); }
   catch(e) {
     if (e.name === 'QuotaExceededError' || e.code === 22) {
-      evictCache();
-      try { localStorage.setItem(k, JSON.stringify(v)); }
-      catch { toast('Storage full — data may not persist'); }
+      // The OSRM cache is the lion's share of stored data — drop it entirely
+      // before warning the user, since it's recomputable.
+      try {
+        state.osrmCache = {};
+        localStorage.removeItem(STORE_CACHE);
+      } catch {}
+      try { localStorage.setItem(k, JSON.stringify(v)); return; }
+      catch {}
+      if (!storageFullToasted) {
+        storageFullToasted = true;
+        toast('Storage full — data may not persist');
+      }
     }
   }
-}
-
-function evictCache() {
-  const keys = Object.keys(state.osrmCache);
-  if (keys.length <= 5) return;
-  const toRemove = keys.slice(0, Math.ceil(keys.length / 2));
-  toRemove.forEach(k => delete state.osrmCache[k]);
-  try { localStorage.setItem(STORE_CACHE, JSON.stringify(state.osrmCache)); } catch {}
 }
 
 /**
@@ -133,7 +135,7 @@ function loadSpots() {
     if (!r) return DEFAULT_SPOTS;
     const parsed = JSON.parse(r);
     if (!Array.isArray(parsed)) return DEFAULT_SPOTS;
-    return parsed.filter(s => s && typeof s.lat === 'number' && typeof s.lng === 'number' && Math.abs(s.lat) <= 90 && Math.abs(s.lng) <= 180);
+    return parsed.filter(s => s && Number.isFinite(s.lat) && Number.isFinite(s.lng) && Math.abs(s.lat) <= 90 && Math.abs(s.lng) <= 180);
   } catch { return DEFAULT_SPOTS; }
 }
 
