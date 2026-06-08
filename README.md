@@ -38,6 +38,21 @@ Open `tests/index.html` in any browser (served over HTTP). Tests cover the solve
 open http://localhost:8000/tests/
 ```
 
+## Development
+
+The app itself has no build step — `index.html` loads ES modules directly. The tooling below is for linting, formatting, type-checking (via JSDoc + `tsc --noEmit`), and running the Node-based unit tests in CI.
+
+```bash
+npm install          # install dev tooling (one-time)
+npm run lint         # ESLint over js/ and tests/
+npm run format       # Prettier write
+npm run format:check # Prettier check (CI)
+npm run typecheck    # tsc --noEmit using jsconfig.json
+npm test             # node --test tests/*.test.js
+```
+
+CI runs all of the above on push and pull request via `.github/workflows/ci.yml`.
+
 ## Architecture
 
 ```

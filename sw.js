@@ -1,4 +1,5 @@
-const CACHE_NAME = 'routeflow-v20';
+// Bump CACHE_NAME on every release that changes static assets.
+const CACHE_NAME = 'routeflow-v21';
 const STATIC_ASSETS = [
   './',
   './index.html',

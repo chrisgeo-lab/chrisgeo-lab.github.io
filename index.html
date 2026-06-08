@@ -2,18 +2,20 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#007AFF">
 <meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' https://unpkg.com; style-src 'self' 'unsafe-inline' https://unpkg.com; img-src 'self' data: blob: https://*.cartocdn.com https://basemaps.cartocdn.com; connect-src 'self' https://router.project-osrm.org https://routing.openstreetmap.de https://nominatim.openstreetmap.org https://photon.komoot.io https://geocoding.geo.census.gov https://*.cartocdn.com https://basemaps.cartocdn.com; worker-src 'self' blob:; child-src blob:; font-src 'self' data:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' https://unpkg.com; style-src 'self' 'unsafe-inline' https://unpkg.com; img-src 'self' data: blob: https://*.cartocdn.com https://basemaps.cartocdn.com https://tiles.basemaps.cartocdn.com; connect-src 'self' https://router.project-osrm.org https://routing.openstreetmap.de https://nominatim.openstreetmap.org https://photon.komoot.io https://geocoding.geo.census.gov https://*.cartocdn.com https://basemaps.cartocdn.com https://tiles.basemaps.cartocdn.com; worker-src 'self' blob:; child-src blob:; font-src 'self' data: https://*.cartocdn.com https://tiles.basemaps.cartocdn.com; manifest-src 'self'">
 <meta name="description" content="Plan multi-stop routes with automatic ordering, route splitting, and turn-by-turn export.">
 <meta property="og:title" content="RouteFlow - Multi-Stop Route Planner">
 <meta property="og:description" content="Plan multi-stop routes with automatic ordering, route splitting, and turn-by-turn export.">
 <meta property="og:type" content="website">
 <title>RouteFlow</title>
+<link rel="canonical" href="https://chrisgeo-lab.github.io/">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%23007AFF'/><circle cx='16' cy='14' r='6' fill='white'/><path d='M16 20 L10 28 L22 28 Z' fill='white'/></svg>">
 <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect width='180' height='180' rx='40' fill='%23007AFF'/><path d='M90 30 L130 75 L110 75 L110 140 L70 140 L70 75 L50 75 Z' fill='white' opacity='0.9'/><circle cx='90' cy='105' r='12' fill='%23007AFF'/></svg>">
@@ -21,9 +23,9 @@
 <link rel="preconnect" href="https://basemaps.cartocdn.com" crossorigin>
 <link rel="preconnect" href="https://photon.komoot.io">
 <link rel="preconnect" href="https://unpkg.com" crossorigin>
-<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" crossorigin="anonymous">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" integrity="sha384-MinO0mNliZ3vwppuPOUnGa+iq619pfMhLVUXfC4LHwSCvF9H+6P/KO4Q7qBOYV5V" crossorigin="anonymous">
 <link rel="stylesheet" href="css/styles.css">
-<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js" integrity="sha384-SYKAG6cglRMN0RVvhNeBY0r3FYKNOJtznwA0v7B5Vp9tr31xAHsZC0DqkQ/pZDmj" crossorigin="anonymous"></script>
 </head>
 <body>
 
