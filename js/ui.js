@@ -12,8 +12,12 @@ function bindPopup(marker, html) {
   el.addEventListener('click', e => {
     e.stopPropagation();
     closePopup();
+    // Guard the click closure: marker may have been removed between bind and click,
+    // and the addMarker stub returns null from getLngLat() — passing null to setLngLat throws.
+    const lngLat = marker.getLngLat && marker.getLngLat();
+    if (!lngLat) return;
     const popup = new maplibregl.Popup({maxWidth: '220px', className: 'stop-popup-wrap', offset: 12})
-      .setLngLat(marker.getLngLat())
+      .setLngLat(lngLat)
       .setHTML(html)
       .addTo(map);
     trackPopup(popup);
@@ -21,6 +25,12 @@ function bindPopup(marker, html) {
 }
 
 export function renderView() {
+  // Drop the empty-state expanded sheet & resize map BEFORE projecting markers.
+  // If the sheet is still .expanded (mobile full-screen) or the empty state is
+  // still up, the map canvas has the wrong dimensions and markers project to
+  // the wrong screen pixels. Running this first means addMarker() below sees
+  // the final canvas size.
+  updateEmptyState();
   clearMap();
   const routes = getActiveRoutes();
   const bounds = [];
@@ -112,7 +122,6 @@ export function renderView() {
   renderNextStop();
   updateProgress();
   updateStopsInfo();
-  updateEmptyState();
   document.getElementById('travelModeBar').classList.toggle('show', state.SPOTS.length > 0);
 }
 
@@ -362,8 +371,10 @@ function updateEmptyState() {
     if (state.sheetState === 'expanded') state.sheetState = 'peek';
     fab.classList.remove('show');
     topBar.style.display = '';
-    // Force a MapLibre canvas resize since the sheet just changed size.
-    requestAnimationFrame(() => { try { map.resize(); } catch {} });
+    // Resize the map canvas synchronously: callers (renderView) place markers
+    // immediately after, so we need correct canvas dimensions NOW rather than
+    // on the next rAF — otherwise marker projection is stale by one frame.
+    try { map.resize(); } catch {}
   }
 }
 

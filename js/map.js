@@ -215,7 +215,13 @@ export function gpsIcon() {
  * @param {{animate?: boolean}} [opts]  `animate:false` jumps; default eases (600ms).
  */
 export function setView(latlng, zoom, opts) {
-  const center = Array.isArray(latlng) ? [latlng[1], latlng[0]] : [latlng.lng, latlng.lat];
+  const lat = Array.isArray(latlng) ? latlng[0] : latlng && latlng.lat;
+  const lng = Array.isArray(latlng) ? latlng[1] : latlng && latlng.lng;
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    console.warn('setView: invalid lat/lng', latlng);
+    return;
+  }
+  const center = [lng, lat];
   map.stop();
   if (opts && opts.animate === false) {
     map.jumpTo({center, zoom});
