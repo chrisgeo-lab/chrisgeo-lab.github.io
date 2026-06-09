@@ -9,7 +9,7 @@
 <meta name="theme-color" content="#007AFF">
 <meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' https://unpkg.com; style-src 'self' 'unsafe-inline' https://unpkg.com; img-src 'self' data: blob: https://*.cartocdn.com https://basemaps.cartocdn.com https://tiles.basemaps.cartocdn.com; connect-src 'self' https://router.project-osrm.org https://routing.openstreetmap.de https://nominatim.openstreetmap.org https://photon.komoot.io https://geocoding.geo.census.gov https://*.cartocdn.com https://basemaps.cartocdn.com https://tiles.basemaps.cartocdn.com; worker-src 'self' blob:; child-src blob:; font-src 'self' data: https://*.cartocdn.com https://tiles.basemaps.cartocdn.com; manifest-src 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' https://unpkg.com; style-src 'self' 'unsafe-inline' https://unpkg.com; img-src 'self' data: blob: https://*.cartocdn.com https://basemaps.cartocdn.com https://tiles.basemaps.cartocdn.com; connect-src 'self' https://router.project-osrm.org https://routing.openstreetmap.de https://valhalla1.openstreetmap.de https://nominatim.openstreetmap.org https://photon.komoot.io https://geocoding.geo.census.gov https://*.cartocdn.com https://basemaps.cartocdn.com https://tiles.basemaps.cartocdn.com; worker-src 'self' blob:; child-src blob:; font-src 'self' data: https://*.cartocdn.com https://tiles.basemaps.cartocdn.com; manifest-src 'self'">
 <meta name="description" content="Plan multi-stop routes with automatic ordering, route splitting, and turn-by-turn export.">
 <meta property="og:title" content="RouteFlow - Multi-Stop Route Planner">
 <meta property="og:description" content="Plan multi-stop routes with automatic ordering, route splitting, and turn-by-turn export.">
@@ -90,28 +90,32 @@
 <!-- Bottom sheet -->
 <div class="bottom-sheet" id="bottomSheet">
   <div class="sheet-handle-area" id="sheetHandle"><div class="sheet-handle"></div></div>
-  <div class="next-stop" id="nextStopCard" style="display:none">
-    <div class="next-stop-label">Next Stop</div>
-    <div class="next-stop-street" id="nextStopName">--</div>
-    <div class="next-stop-meta">
-      <span id="nextStopDist">--</span>
-      <span id="nextStopTime">--</span>
+  <div class="route-settings-card" id="routeSettingsCard" style="display:none">
+    <div class="route-settings-section">
+      <div class="route-settings-label">Route Points</div>
+      <div class="route-settings-actions">
+        <button class="route-settings-btn" id="setStartBtn" aria-label="Set route start point" title="Where to begin routing (default: GPS location)">
+          <span style="font-size:14px">&#9654;</span>
+          <span>Start Point</span>
+        </button>
+        <button class="route-settings-btn" id="setHomeBtn" aria-label="Set route end point" title="Optional return destination after all stops">
+          <span style="font-size:14px">&#9632;</span>
+          <span>End Point</span>
+        </button>
+      </div>
     </div>
-    <div class="next-stop-actions">
-      <button class="nav-btn nav-btn-secondary" id="setStartBtn" aria-label="Set route start point" title="Default: your GPS location">Start</button>
-      <button class="nav-btn nav-btn-secondary" id="setHomeBtn" aria-label="Set route end point" title="Optional: route ends at last stop if not set">End</button>
-    </div>
-  </div>
-  <div id="gmapsExportCard" style="margin:0 16px 10px;display:none">
-    <div style="display:flex;gap:8px">
-      <button id="gmapsFullRouteBtn" class="gmaps-btn" style="flex:1">
-        <span style="font-size:18px">&#9656;</span>
-        Google Maps
-      </button>
-      <button id="appleMapsBtn" class="apple-maps-btn" style="flex:1">
-        <span style="font-size:18px">&#9656;</span>
-        Apple Maps
-      </button>
+    <div class="route-settings-section" id="exportSection" style="display:none">
+      <div class="route-settings-label">Export for Navigation</div>
+      <div class="route-settings-actions">
+        <button id="gmapsFullRouteBtn" class="export-btn export-btn-google">
+          <span style="font-size:16px">&#128279;</span>
+          <span>Google Maps</span>
+        </button>
+        <button id="appleMapsBtn" class="export-btn export-btn-apple">
+          <span style="font-size:16px">&#128279;</span>
+          <span>Apple Maps</span>
+        </button>
+      </div>
     </div>
   </div>
   <div class="travel-mode-bar" id="travelModeBar">
@@ -133,7 +137,6 @@
       <div class="route-stat"><div class="route-stat-val" id="statMi">--</div><div class="route-stat-label">Miles</div></div>
       <div class="route-stat"><div class="route-stat-val" id="statTime">--</div><div class="route-stat-label">Drive</div></div>
       <div class="route-stat"><div class="route-stat-val" id="statStops">--</div><div class="route-stat-label">Stops</div></div>
-      <div class="route-stat"><div class="route-stat-val" id="statDone">0</div><div class="route-stat-label">Done</div></div>
     </div>
   </div>
   <div class="filter-row" id="filterRow">
