@@ -85,6 +85,16 @@ export function loadJSON(k) {
   try { const r = localStorage.getItem(k); return r ? JSON.parse(r) : null; }
   catch { return null; }
 }
+
+/** Validate anchor object from localStorage — reject if missing lat/lng to prevent crashes. */
+function validateAnchor(anchor) {
+  if (!anchor) return null;
+  if (!Number.isFinite(anchor.lat) || !Number.isFinite(anchor.lng)) {
+    console.warn('validateAnchor: corrupt anchor data, ignoring', anchor);
+    return null;
+  }
+  return anchor;
+}
 /** Persist a Set as a JSON array under `k`. */
 export function saveSet(k, s) { saveJSON(k, [...s]); }
 let storageFullToasted = false;
@@ -115,8 +125,12 @@ export function saveJSON(k, v) {
  * @returns {Anchor|null}
  */
 export function getStartLocation() {
-  if (state.startPoint) return state.startPoint;
-  if (state.gpsPos) return {lat: state.gpsPos.lat, lng: state.gpsPos.lng, label: 'Current Location'};
+  if (state.startPoint && Number.isFinite(state.startPoint.lat) && Number.isFinite(state.startPoint.lng)) {
+    return state.startPoint;
+  }
+  if (state.gpsPos && Number.isFinite(state.gpsPos.lat) && Number.isFinite(state.gpsPos.lng)) {
+    return {lat: state.gpsPos.lat, lng: state.gpsPos.lng, label: 'Current Location'};
+  }
   return null;
 }
 
@@ -154,8 +168,9 @@ function loadSpots() {
 export const state = {
   SPOTS: loadSpots(),
   visitedSet: loadSet(STORE_V),
-  home: loadJSON(STORE_H),
-  startPoint: loadJSON(STORE_START),
+  // Validate anchors from localStorage — corrupt data (missing lat/lng) causes crashes.
+  home: validateAnchor(loadJSON(STORE_H)),
+  startPoint: validateAnchor(loadJSON(STORE_START)),
   numClusters: 1,
   activeFilter: -1,
   currentRoutes: [],
