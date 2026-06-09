@@ -39,17 +39,31 @@ export const DEFAULT_SPOTS = [];
 export const STORE_SPOTS = 'routeflow-spots';
 export const COLORS = ['#007AFF','#34C759','#FF9500','#AF52DE','#FF2D55','#5AC8FA','#5856D6','#FF6482'];
 export const STOP_MIN = 3;
-// OSRM HTTP API path is /{table,route}/v1/{service}/{coords}. The {service}
-// segment is a generic placeholder — each public routing.openstreetmap.de
-// server is already specialized for one profile (routed-bike, routed-foot,
-// routed-car) and only advertises the 'driving' service. Using 'bike'/'foot'
-// here causes 400 InvalidService responses.
+// Routing API profiles with primary + fallback servers.
+// OSRM: /{table,route}/v1/driving/{coords}
+// Valhalla: /route with JSON POST body
 export const OSRM_PROFILES = {
-  car: {primary: 'https://router.project-osrm.org', fallback: 'https://routing.openstreetmap.de/routed-car', service: 'driving'},
-  bike: {primary: 'https://routing.openstreetmap.de/routed-bike', fallback: null, service: 'driving'},
-  walk: {primary: 'https://routing.openstreetmap.de/routed-foot', fallback: null, service: 'driving'}
+  car: {
+    primary: 'https://router.project-osrm.org',
+    fallback: 'https://routing.openstreetmap.de/routed-car',
+    valhalla: 'https://valhalla1.openstreetmap.de',
+    service: 'driving'
+  },
+  bike: {
+    primary: 'https://routing.openstreetmap.de/routed-bike',
+    fallback: null,
+    valhalla: 'https://valhalla1.openstreetmap.de',
+    service: 'bike'
+  },
+  walk: {
+    primary: 'https://routing.openstreetmap.de/routed-foot',
+    fallback: null,
+    valhalla: 'https://valhalla1.openstreetmap.de',
+    service: 'foot'
+  }
 };
 export const STORE_V = 'routeflow-visited';
+export const STORE_ROUTE_MAP = 'routeflow-visited-routes'; // Maps spot ID → route index
 export const STORE_H = 'routeflow-home';
 export const STORE_START = 'routeflow-start';
 export const STORE_CACHE = 'routeflow-osrm-cache';
@@ -136,10 +150,14 @@ export function getStartLocation() {
 
 /**
  * Return the routes the UI is currently displaying.
- * Reads `state.activeFilter` (a single-route filter when ≥0) and `state.currentRoutes`.
+ * Reads `state.activeFilter`:
+ *   -1 = all routes
+ *   -2 = visited only (returns empty array, UI handles separately)
+ *   >= 0 = single route by index
  * @returns {Route[]}
  */
 export function getActiveRoutes() {
+  if (state.activeFilter === -2) return []; // Visited-only view, no active routes
   return state.activeFilter >= 0 ? [state.currentRoutes[state.activeFilter]] : state.currentRoutes;
 }
 
@@ -168,6 +186,7 @@ function loadSpots() {
 export const state = {
   SPOTS: loadSpots(),
   visitedSet: loadSet(STORE_V),
+  visitedRouteMap: loadJSON(STORE_ROUTE_MAP) || {}, // Maps spot ID → route index when visited
   // Validate anchors from localStorage — corrupt data (missing lat/lng) causes crashes.
   home: validateAnchor(loadJSON(STORE_H)),
   startPoint: validateAnchor(loadJSON(STORE_START)),

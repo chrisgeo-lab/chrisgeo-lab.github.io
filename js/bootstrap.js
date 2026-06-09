@@ -23,18 +23,19 @@ export function initBootstrap() {
   mapReady.then(dismissLoader);
   setTimeout(dismissLoader, LOADER_TIMEOUT_MS);
 
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js').then(reg => {
-      reg.addEventListener('updatefound', () => {
-        const newWorker = reg.installing;
-        newWorker.addEventListener('statechange', () => {
-          if (newWorker.state === 'activated' && navigator.serviceWorker.controller) {
-            toast('Update available — refresh to get it');
-          }
-        });
-      });
-    }).catch(() => {});
-  }
+  // TEMPORARILY DISABLED: Service worker causing cache issues during development
+  // if ('serviceWorker' in navigator) {
+  //   navigator.serviceWorker.register('sw.js').then(reg => {
+  //     reg.addEventListener('updatefound', () => {
+  //       const newWorker = reg.installing;
+  //       newWorker.addEventListener('statechange', () => {
+  //         if (newWorker.state === 'activated' && navigator.serviceWorker.controller) {
+  //           toast('Update available — refresh to get it');
+  //         }
+  //       });
+  //     });
+  //   }).catch(() => {});
+  // }
 
   window.addEventListener('unhandledrejection', e => {
     console.error('Unhandled promise rejection:', e.reason);

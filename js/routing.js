@@ -51,6 +51,35 @@ async function fetchFromAnyServer(path, timeoutMs) {
   }
 }
 
+async function fetchValhalla(pts, costingMode) {
+  const profile = getProfile();
+  if (!profile.valhalla) throw new Error('No Valhalla server configured');
+
+  const locations = pts.map(p => ({lat: p.lat, lon: p.lng}));
+  const body = {
+    locations,
+    costing: costingMode || 'auto',
+    directions_options: {units: 'miles'}
+  };
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+  try {
+    const r = await fetch(`${profile.valhalla}/route`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body),
+      signal: controller.signal
+    });
+    clearTimeout(timeout);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return await r.json();
+  } catch (e) {
+    clearTimeout(timeout);
+    throw e;
+  }
+}
+
 /**
  * Fetch an N×N OSRM duration matrix in seconds for the given points.
  * Reads `state.travelMode` to pick the OSRM profile.
@@ -115,15 +144,93 @@ async function fetchTableChunked(pts) {
 export async function fetchRoute(pts) {
   const key = cacheKey(pts);
   if (state.osrmCache[key]) return state.osrmCache[key];
-  const c = pts.map(p => `${p.lng},${p.lat}`).join(';');
-  const svc = getProfile().service;
-  const r = await fetchFromAnyServer(`/route/v1/${svc}/${c}?overview=full&geometries=geojson&steps=true`);
-  const d = await r.json();
-  if (d.code !== 'Ok') throw new Error(d.message || d.code);
-  state.osrmCache[key] = d.routes[0];
-  trimCache();
-  saveJSON(STORE_CACHE, state.osrmCache);
-  return d.routes[0];
+
+  // Try OSRM first (primary + fallback servers)
+  try {
+    const c = pts.map(p => `${p.lng},${p.lat}`).join(';');
+    const svc = getProfile().service;
+    const r = await fetchFromAnyServer(`/route/v1/${svc}/${c}?overview=full&geometries=geojson&steps=true`);
+    const d = await r.json();
+    if (d.code !== 'Ok') throw new Error(d.message || d.code);
+    state.osrmCache[key] = d.routes[0];
+    trimCache();
+    saveJSON(STORE_CACHE, state.osrmCache);
+    return d.routes[0];
+  } catch (osrmError) {
+    console.warn('OSRM failed, trying Valhalla:', osrmError);
+
+    // Fallback to Valhalla
+    try {
+      const costingMap = {car: 'auto', bike: 'bicycle', walk: 'pedestrian'};
+      const vd = await fetchValhalla(pts, costingMap[state.travelMode] || 'auto');
+
+      if (!vd.trip || !vd.trip.legs) throw new Error('Invalid Valhalla response');
+
+      // Convert Valhalla response to OSRM-like format
+      const legs = vd.trip.legs.map(leg => ({
+        distance: leg.summary.length * 1609.34, // miles to meters
+        duration: leg.summary.time,
+        steps: []
+      }));
+
+      const route = {
+        distance: vd.trip.summary.length * 1609.34,
+        duration: vd.trip.summary.time,
+        geometry: {
+          type: 'LineString',
+          coordinates: vd.trip.legs.flatMap(leg =>
+            leg.shape.map(pt => [pt.lon, pt.lat])
+          )
+        },
+        legs
+      };
+
+      state.osrmCache[key] = route;
+      trimCache();
+      saveJSON(STORE_CACHE, state.osrmCache);
+      return route;
+    } catch (valhallaError) {
+      console.warn('Valhalla also failed:', valhallaError);
+      throw new Error('All routing services failed');
+    }
+  }
+}
+
+/**
+ * Fetch duration matrix from Valhalla sources_to_targets endpoint.
+ * @param {Spot[]} sources - Source points
+ * @param {Spot[]} targets - Target points
+ * @returns {Promise<number[][]>}
+ */
+async function fetchValhallaMatrix(sources, targets) {
+  const profile = getProfile();
+  if (!profile.valhalla) throw new Error('No Valhalla server configured');
+
+  const costingMap = {car: 'auto', bike: 'bicycle', walk: 'pedestrian'};
+  const body = {
+    sources: sources.map(p => ({lat: p.lat, lon: p.lng})),
+    targets: targets.map(p => ({lat: p.lat, lon: p.lng})),
+    costing: costingMap[state.travelMode] || 'auto'
+  };
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
+  try {
+    const r = await fetch(`${profile.valhalla}/sources_to_targets`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body),
+      signal: controller.signal
+    });
+    clearTimeout(timeout);
+    if (!r.ok) throw new Error(`Valhalla HTTP ${r.status}`);
+    const data = await r.json();
+    // Valhalla returns sources_to_targets with time in seconds
+    return data.sources_to_targets.map(row => row.map(cell => cell.time));
+  } catch (e) {
+    clearTimeout(timeout);
+    throw e;
+  }
 }
 
 /**
@@ -146,7 +253,7 @@ export function buildHaversineMatrix(pts) {
 
 /**
  * Get (and memoize on `state.durationMatrix`) the full N×N duration matrix for `state.SPOTS`.
- * Falls back to haversine on OSRM failure and sets `state.matrixFallback = true`.
+ * Falls back to Valhalla, then haversine on OSRM failure and sets `state.matrixFallback = true`.
  * @param {() => void} renderFn - Re-render hook used by the inline retry banner.
  * @returns {Promise<number[][]>}
  */
@@ -157,15 +264,24 @@ export async function getFullDurationMatrix(renderFn) {
     state.durationMatrix = data.durations;
     state.matrixFallback = false;
   } catch (e) {
-    console.warn('OSRM table failed, using haversine fallback:', e.message);
-    state.durationMatrix = buildHaversineMatrix(state.SPOTS);
-    state.matrixFallback = true;
-    if (state.SPOTS.length > 10) {
-      showError('Using approximate distances (server unavailable)', () => {
-        state.durationMatrix = null;
-        state.matrixFallback = false;
-        renderFn();
-      });
+    console.warn('OSRM table failed, trying Valhalla:', e.message);
+    // Try Valhalla before falling back to haversine
+    try {
+      const matrix = await fetchValhallaMatrix(state.SPOTS, state.SPOTS);
+      state.durationMatrix = matrix;
+      state.matrixFallback = false;
+      console.log('✓ Using Valhalla for routing');
+    } catch (valhallaError) {
+      console.warn('Valhalla also failed, using haversine fallback:', valhallaError.message);
+      state.durationMatrix = buildHaversineMatrix(state.SPOTS);
+      state.matrixFallback = true;
+      if (state.SPOTS.length > 10) {
+        showError('Using approximate distances (server unavailable)', () => {
+          state.durationMatrix = null;
+          state.matrixFallback = false;
+          renderFn();
+        });
+      }
     }
   }
   return state.durationMatrix;

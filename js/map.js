@@ -113,7 +113,7 @@ export function addMarker(lat, lng, icon) {
   // throw "LngLat is not defined" and abort the whole render loop.
   if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
     console.warn('addMarker: invalid lat/lng', lat, lng);
-    return { _invalid: true, getLngLat: () => null, getElement: () => null, remove() {}, _el: null, _lngLat: null };
+    return { _invalid: true, getLngLat: () => null, getElement: () => null, remove() {}, _el: null };
   }
   const el = document.createElement('div');
   el.innerHTML = icon.html;
@@ -127,8 +127,6 @@ export function addMarker(lat, lng, icon) {
     .setLngLat([lng, lat])
     .addTo(map);
   markers.push(marker);
-  marker._el = el;
-  marker._lngLat = [lng, lat];
   return marker;
 }
 
@@ -265,11 +263,16 @@ export function fitBounds(bounds, opts) {
       if (opts.paddingTopLeft) { padding.left = opts.paddingTopLeft[0]; padding.top = opts.paddingTopLeft[1]; }
       if (opts.paddingBottomRight) { padding.right = opts.paddingBottomRight[0]; padding.bottom = opts.paddingBottomRight[1]; }
     }
+
+    // Use cameraForBounds + jumpTo instead of fitBounds to avoid triggering move events.
     map.stop();
-    map.fitBounds(lngLatBounds, {padding, duration: 0});
+    const camera = map.cameraForBounds(lngLatBounds, {padding});
+    if (camera) map.jumpTo(camera);
   } else {
+    // Direct LngLatBounds input
     map.stop();
-    map.fitBounds(bounds, {...opts, duration: 0});
+    const camera = map.cameraForBounds(bounds, opts);
+    if (camera) map.jumpTo(camera);
   }
 }
 

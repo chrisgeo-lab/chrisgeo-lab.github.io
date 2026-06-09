@@ -1,7 +1,10 @@
-import { state, STOP_MIN, STORE_V, saveSet, getStartLocation, getActiveRoutes } from './state.js';
-import { esc, fmtMi, fmtTime, fmtDur, toast } from './utils.js';
+import { state, STOP_MIN, getStartLocation, getActiveRoutes } from './state.js';
+import { esc, fmtMi, fmtDur } from './utils.js';
 import { map, clearMap, addMarker, addPolyline, stopIcon, homeIcon, gpsIcon, trackPopup, setView, fitBounds, closePopup } from './map.js';
-export { render } from './planner.js';
+import { render } from './planner.js';
+import { toggleVisited, renderVisitedMarkersOnly, updateProgress } from './visited.js';
+import { renderFilterBar, renderStats, renderRouteSettings, renderVisitedOnlyView, updateStopsInfo } from './ui-panels.js';
+export { render, toggleVisited };
 
 let gpsMarker = null;
 
@@ -24,6 +27,7 @@ function bindPopup(marker, html) {
   });
 }
 
+
 export function renderView() {
   // Drop the empty-state expanded sheet & resize map BEFORE projecting markers.
   // If the sheet is still .expanded (mobile full-screen) or the empty state is
@@ -36,6 +40,40 @@ export function renderView() {
   const bounds = [];
   const routeSpotIds = new Set();
   const lineWeight = routes.length === 1 ? 5 : 4;
+
+  // Special case: Visited-only view (activeFilter === -2)
+  if (state.activeFilter === -2) {
+    renderVisitedMarkersOnly(bounds, bindPopup);
+    if (state.home && Number.isFinite(state.home.lat) && Number.isFinite(state.home.lng)) {
+      const mk = addMarker(state.home.lat, state.home.lng, homeIcon());
+      bindPopup(mk, `<div class="stop-popup"><div class="stop-popup-label" style="color:#FF9500">End Point</div><div class="stop-popup-street">${esc(state.home.label)}</div></div>`);
+      bounds.push([state.home.lat, state.home.lng]);
+    }
+    if (state.startPoint && Number.isFinite(state.startPoint.lat) && Number.isFinite(state.startPoint.lng)) {
+      const mk = addMarker(state.startPoint.lat, state.startPoint.lng, {html: '<div style="width:20px;height:20px;background:#007AFF;border:2px solid #fff;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff">&#9654;</div>'});
+      bindPopup(mk, `<div class="stop-popup"><div class="stop-popup-label" style="color:#007AFF">Start Point</div><div class="stop-popup-street">${esc(state.startPoint.label)}</div></div>`);
+      bounds.push([state.startPoint.lat, state.startPoint.lng]);
+    }
+    if (gpsMarker) { gpsMarker.remove(); gpsMarker = null; }
+    if (state.gpsPos && Number.isFinite(state.gpsPos.lat) && Number.isFinite(state.gpsPos.lng)) {
+      gpsMarker = addMarker(state.gpsPos.lat, state.gpsPos.lng, gpsIcon());
+    }
+    if (bounds.length && !state.suppressFitBounds) {
+      const isDesktop = window.innerWidth >= 768;
+      const padding = isDesktop ? {paddingTopLeft: [60, 80], paddingBottomRight: [420, 60]} : {padding: [60, 220]};
+      fitBounds(bounds, padding);
+    }
+    state.suppressFitBounds = false;
+    const isCalculating = document.getElementById('loading').classList.contains('active');
+    renderFilterBar(closeRouteDropdown, renderView);
+    renderStats(isCalculating);
+    renderStopList();
+    renderRouteSettings(isCalculating);
+    updateProgress();
+    updateStopsInfo();
+    document.getElementById('travelModeBar').classList.toggle('show', state.SPOTS.length > 0);
+    return;
+  }
   // If there are no resolved routes yet, render the raw stop list so users
   // see something while routing is loading or after a routing failure.
   if (!routes.length && state.SPOTS.length) {
@@ -116,49 +154,14 @@ export function renderView() {
   }
   state.suppressFitBounds = false;
 
-  renderFilterBar();
-  renderStats();
+  const isCalculating = document.getElementById('loading').classList.contains('active');
+  renderFilterBar(closeRouteDropdown, renderView);
+  renderStats(isCalculating);
   renderStopList();
-  renderNextStop();
+  renderRouteSettings(isCalculating);
   updateProgress();
   updateStopsInfo();
   document.getElementById('travelModeBar').classList.toggle('show', state.SPOTS.length > 0);
-}
-
-function renderFilterBar() {
-  const row = document.getElementById('filterRow');
-  const trigger = document.getElementById('routeDropdownTrigger');
-  const menu = document.getElementById('routeDropdownMenu');
-  if (state.numClusters <= 1) { row.style.display = 'none'; return; }
-  row.style.display = 'block';
-
-  const totalRemaining = state.currentRoutes.reduce((s, r) => s + r.route.length, 0);
-  const totalDone = state.visitedSet.size;
-  const totalAll = totalRemaining + totalDone;
-
-  if (state.activeFilter === -1) {
-    trigger.innerHTML = `<span class="route-dropdown-dot" style="background:var(--blue)"></span><span class="route-dropdown-label">All Routes</span><span class="route-dropdown-meta">${totalDone}/${totalAll} done</span>`;
-  } else {
-    const r = state.currentRoutes[state.activeFilter];
-    trigger.innerHTML = `<span class="route-dropdown-dot" style="background:${r.color}"></span><span class="route-dropdown-label">${esc(r.name)}</span><span class="route-dropdown-meta">${r.route.length} remaining · ${r.totalMiles.toFixed(1)} mi</span>`;
-  }
-
-  menu.innerHTML = '';
-  const allItem = document.createElement('div');
-  allItem.className = 'route-dropdown-item' + (state.activeFilter === -1 ? ' selected' : '');
-  allItem.innerHTML = `<span class="route-dropdown-dot" style="background:var(--blue)"></span><div class="route-dropdown-item-info"><div class="route-dropdown-item-name">All Routes</div><div class="route-dropdown-item-detail"><span>${totalAll} stops</span><div class="route-dropdown-item-progress"><div class="route-dropdown-item-progress-fill" style="width:${totalAll ? (totalDone / totalAll) * 100 : 0}%;background:var(--blue)"></div></div><span>${totalDone}/${totalAll}</span></div></div>`;
-  allItem.onclick = () => { state.activeFilter = -1; closeRouteDropdown(); renderView(); };
-  menu.appendChild(allItem);
-
-  const maxMiles = Math.max(...state.currentRoutes.map(r => r.totalMiles), 1);
-  state.currentRoutes.forEach((r, i) => {
-    const pct = (r.totalMiles / maxMiles) * 100;
-    const item = document.createElement('div');
-    item.className = 'route-dropdown-item' + (state.activeFilter === i ? ' selected' : '');
-    item.innerHTML = `<span class="route-dropdown-dot" style="background:${r.color}"></span><div class="route-dropdown-item-info"><div class="route-dropdown-item-name">${esc(r.name)}</div><div class="route-dropdown-item-detail"><span>${r.route.length} stops · ${r.totalMiles.toFixed(1)} mi</span><div class="route-dropdown-item-progress"><div class="route-dropdown-item-progress-fill" style="width:${pct.toFixed(1)}%;background:${r.color}"></div></div></div></div>`;
-    item.onclick = () => { state.activeFilter = i; closeRouteDropdown(); renderView(); };
-    menu.appendChild(item);
-  });
 }
 
 export function toggleRouteDropdown() {
@@ -174,62 +177,17 @@ export function closeRouteDropdown() {
   document.getElementById('routeDropdownMenu').classList.remove('open');
 }
 
-function renderStats() {
-  const routes = getActiveRoutes();
-  const totalMi = routes.reduce((s, r) => s + r.totalMiles, 0);
-  const totalMin = routes.reduce((s, r) => s + r.totalMinutes, 0);
-  const unvisitedStops = routes.reduce((s, r) => s + r.route.length, 0);
-  const done = state.SPOTS.filter(s => state.visitedSet.has(s.id)).length;
-  const totalStops = unvisitedStops + done;
-  document.getElementById('statMi').textContent = totalMi.toFixed(1);
-  document.getElementById('statTime').textContent = fmtTime(totalMin + unvisitedStops * STOP_MIN);
-  document.getElementById('statStops').textContent = totalStops;
-  document.getElementById('statDone').textContent = done;
-  document.getElementById('routeSummary').style.display = 'flex';
-  const modeLabels = {car: 'Drive', bike: 'Bike', walk: 'Walk'};
-  const timeLabel = document.querySelector('#routeSummary .route-stat:nth-child(2) .route-stat-label');
-  if (timeLabel) timeLabel.textContent = modeLabels[state.travelMode] || 'Drive';
-  const endLabel = state.home ? ` &middot; &#8594; ${esc((state.home.label || 'End').split(',')[0])}` : '';
-  document.getElementById('topSubtitle').innerHTML = `${done}/${totalStops} stops &middot; ${totalMi.toFixed(1)} mi${endLabel}`;
-}
-
-function renderNextStop() {
-  const card = document.getElementById('nextStopCard');
-  const gmapsCard = document.getElementById('gmapsExportCard');
-  const routes = getActiveRoutes();
-  let nextSpot = null, nextLeg = null;
-  for (const r of routes) {
-    for (let i = 0; i < r.route.length; i++) {
-      const sp = typeof r.route[i] === 'number' ? state.SPOTS[r.route[i]] : r.route[i];
-      if (!state.visitedSet.has(sp.id)) {
-        nextSpot = sp;
-        nextLeg = r.legs ? r.legs[(getStartLocation() ? 1 : 0) + i] : null;
-        break;
-      }
-    }
-    if (nextSpot) break;
-  }
-  if (nextSpot) {
-    card.style.display = 'block';
-    gmapsCard.style.display = 'block';
-    document.getElementById('nextStopName').textContent = nextSpot.street;
-    document.getElementById('nextStopDist').textContent = nextLeg ? `${fmtMi(nextLeg.distance)} mi` : '--';
-    document.getElementById('nextStopTime').textContent = nextLeg ? `~${fmtDur(nextLeg.duration)}` : '--';
-    card.dataset.spotId = nextSpot.id;
-  } else {
-    card.style.display = 'block';
-    gmapsCard.style.display = 'none';
-    document.getElementById('nextStopName').textContent = 'All stops complete!';
-    document.getElementById('nextStopDist').textContent = '';
-    document.getElementById('nextStopTime').textContent = '';
-    card.dataset.spotId = '';
-  }
-}
-
 export function renderStopList() {
   const el = document.getElementById('stopsView'); el.innerHTML = '';
   const routes = getActiveRoutes();
   const query = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
+
+  // Special case: Visited-only view (activeFilter === -2)
+  if (state.activeFilter === -2) {
+    renderVisitedOnlyView(el, query);
+    return;
+  }
+
   // No resolved route yet — show stops in import order so the panel isn't blank.
   if (!routes.length && state.SPOTS.length) {
     state.SPOTS.forEach((spot, i) => {
@@ -297,13 +255,17 @@ export function renderStopList() {
       el.appendChild(hi);
     }
   });
+
+  // Show visited stops in a single "Visited" section (no route grouping except in Visited view)
   const visitedSpots = state.SPOTS.filter(s => state.visitedSet.has(s.id));
   if (visitedSpots.length) {
     if (query && !visitedSpots.some(s => s.street.toLowerCase().includes(query) || s.city.toLowerCase().includes(query))) return;
+
     const hdr = document.createElement('div');
     hdr.className = 'section-hdr section-hdr-visited';
     hdr.innerHTML = `<span class="section-hdr-dot" style="background:var(--tertiary)"></span><span class="section-hdr-title">Visited</span><span class="section-hdr-meta">${visitedSpots.length} done</span>`;
     el.appendChild(hdr);
+
     visitedSpots.forEach(spot => {
       if (query && !spot.street.toLowerCase().includes(query) && !spot.city.toLowerCase().includes(query)) return;
       const item = document.createElement('div');
@@ -319,36 +281,6 @@ export function renderStopList() {
       el.appendChild(item);
     });
   }
-}
-
-export function toggleVisited(id) {
-  const wasVisited = state.visitedSet.has(id);
-  if (wasVisited) state.visitedSet.delete(id); else state.visitedSet.add(id);
-  saveSet(STORE_V, state.visitedSet);
-  if (!wasVisited && navigator.vibrate) navigator.vibrate(10);
-  state.suppressFitBounds = true;
-  renderView();
-  if (!wasVisited && state.visitedSet.size === state.SPOTS.length) {
-    celebrate();
-  }
-}
-
-function celebrate() {
-  toast('All stops done!');
-  if (navigator.vibrate) navigator.vibrate([100, 80, 100, 80, 200]);
-}
-
-function updateProgress() {
-  const total = state.SPOTS.length; const done = state.visitedSet.size;
-  document.getElementById('progressBar').style.width = `${total ? (done / total) * 100 : 0}%`;
-}
-
-function updateStopsInfo() {
-  const badge = document.getElementById('stopsInfoBadge');
-  const text = document.getElementById('stopsInfoText');
-  if (!state.SPOTS.length) { badge.style.display = 'none'; return; }
-  badge.style.display = 'flex';
-  text.textContent = `${state.SPOTS.length} stop${state.SPOTS.length !== 1 ? 's' : ''}`;
 }
 
 function updateEmptyState() {

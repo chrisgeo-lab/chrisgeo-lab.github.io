@@ -72,13 +72,16 @@ export function loadDemo(renderFn) {
   state.numClusters = DEMO_NUM_CLUSTERS;
   state.activeFilter   = -1;
   state.currentRoutes  = [];
-  state.demoMode       = true;
-  state.matrixFallback = true;
-  state.durationMatrix = buildHaversineMatrix(state.SPOTS);
+  state.demoMode       = false; // Use real routing even during demo
+  state.matrixFallback = false;
+  state.durationMatrix = null; // Let routing fetch real OSRM matrix
 
   syncClusterSlider(DEMO_NUM_CLUSTERS, DEMO_CLUSTER_MAX);
 
-  // Kick render; planner will see demoMode=true and skip the network.
+  // Suppress renderView's fitBounds — demo handles framing after CSS settles.
+  state.suppressFitBounds = true;
+
+  // Kick render with real OSRM routing.
   Promise.resolve(renderFn()).catch(e => console.error('Demo render failed:', e));
 
   // Frame the demo on the next paint regardless of route resolution.
@@ -99,7 +102,7 @@ export function restoreFromDemo(renderFn) {
   state.numClusters    = saved.numClusters;
   state.startPoint     = saved.startPoint;
   state.home           = saved.home;
-  state.durationMatrix = saved.durationMatrix ?? null;
+  state.durationMatrix = null; // Clear matrix to force re-routing with user's data
   state.demoMode       = false;
   state.matrixFallback = false;
   state.currentRoutes  = [];

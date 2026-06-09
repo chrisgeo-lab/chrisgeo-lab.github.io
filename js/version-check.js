@@ -3,7 +3,7 @@
  * Prevents bugs from stale cached data across deployments.
  */
 
-const CURRENT_VERSION = '29'; // Increment on every breaking change
+const CURRENT_VERSION = '44'; // Increment on every breaking change
 const VERSION_KEY = 'routeflow-app-version';
 
 function getStoredVersion() {

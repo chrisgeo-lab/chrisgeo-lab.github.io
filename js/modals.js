@@ -3,66 +3,11 @@ import { toast, trapFocus } from './utils.js';
 import { geocodeFreeform } from './geocoder.js';
 import { render } from './ui.js';
 import { setAnchor, anchorFromSpotId } from './anchors.js';
+import { requestLocationWithPrompt } from './geolocation.js';
+import { initModeTabs, getActiveMode, renderStopList, showCurrentSelection } from './modal-helpers.js';
 
 let releaseHomeTrap = null;
 let releaseStartTrap = null;
-
-function initModeTabs(modal, tabsId, contentId) {
-  const tabs = modal.querySelectorAll(`#${tabsId} .point-mode-tab`);
-  const sections = modal.querySelectorAll(`#${contentId} .point-mode-section`);
-  tabs.forEach(tab => {
-    tab.addEventListener('click', () => {
-      const mode = tab.dataset.mode;
-      tabs.forEach(t => t.classList.toggle('active', t === tab));
-      sections.forEach(s => s.classList.toggle('active', s.dataset.mode === mode));
-    });
-  });
-}
-
-function getActiveMode(tabsId) {
-  const active = document.querySelector(`#${tabsId} .point-mode-tab.active`);
-  return active ? active.dataset.mode : null;
-}
-
-function renderStopList(listEl, searchEl, onSelect) {
-  function renderFiltered(query) {
-    listEl.innerHTML = '';
-    const q = (query || '').toLowerCase();
-    state.SPOTS.forEach((spot, i) => {
-      const label = spot.street || spot.label || `Stop ${i + 1}`;
-      const city = spot.city || '';
-      if (q && !label.toLowerCase().includes(q) && !city.toLowerCase().includes(q)) return;
-      const item = document.createElement('div');
-      item.className = 'point-stop-item';
-      item.innerHTML = `<span class="point-stop-item-num">${i + 1}</span><div class="point-stop-item-info"><div class="point-stop-item-name">${label}</div>${city ? `<div class="point-stop-item-city">${city}${spot.state ? ', ' + spot.state : ''}</div>` : ''}</div>`;
-      item.dataset.idx = i;
-      item.addEventListener('click', () => {
-        listEl.querySelectorAll('.point-stop-item').forEach(el => el.classList.remove('selected'));
-        item.classList.add('selected');
-        if (onSelect) onSelect(i);
-      });
-      listEl.appendChild(item);
-    });
-    if (!listEl.children.length) {
-      listEl.innerHTML = '<div class="point-stop-empty">No matching stops</div>';
-    }
-  }
-
-  renderFiltered('');
-  if (searchEl) {
-    searchEl.value = '';
-    searchEl.oninput = () => renderFiltered(searchEl.value);
-  }
-}
-
-function showCurrentSelection(displayEl, valueEl, point, fallbackLabel) {
-  if (point) {
-    displayEl.style.display = 'flex';
-    valueEl.textContent = point.label || fallbackLabel || 'Set';
-  } else {
-    displayEl.style.display = 'none';
-  }
-}
 
 // --- Start Point Modal ---
 
@@ -86,9 +31,27 @@ export function showStartModal() {
 
   const tabs = modal.querySelectorAll('#startModeTabs .point-mode-tab');
   const sections = modal.querySelectorAll('#startModeContent .point-mode-section');
+
+  // Disable GPS tab if unavailable or denied
+  const gpsTab = Array.from(tabs).find(t => t.dataset.mode === 'gps');
+  const gpsUnavailable = state.gpsState === 'unavailable' || state.gpsState === 'denied';
+  if (gpsTab) {
+    gpsTab.disabled = gpsUnavailable;
+    gpsTab.style.opacity = gpsUnavailable ? '0.5' : '1';
+    gpsTab.style.cursor = gpsUnavailable ? 'not-allowed' : 'pointer';
+    if (gpsUnavailable) {
+      gpsTab.title = state.gpsState === 'unavailable'
+        ? 'GPS not available on this device'
+        : 'GPS permission denied — enable in browser settings';
+    }
+  }
+
   let activeMode = 'gps';
   if (state.startPoint && state.startPoint.spotId != null) activeMode = 'stop';
   else if (state.startPoint) activeMode = 'address';
+  // If GPS unavailable and would be default, switch to address mode
+  if (gpsUnavailable && activeMode === 'gps') activeMode = 'address';
+
   tabs.forEach(t => t.classList.toggle('active', t.dataset.mode === activeMode));
   sections.forEach(s => s.classList.toggle('active', s.dataset.mode === activeMode));
 
@@ -111,6 +74,20 @@ export async function confirmStart() {
   const mode = getActiveMode('startModeTabs');
 
   if (mode === 'gps') {
+    // Block if GPS unavailable
+    if (state.gpsState === 'unavailable') {
+      toast('GPS is not available on this device');
+      return;
+    }
+    if (state.gpsState === 'denied') {
+      toast('GPS permission denied. Enable location services in your browser settings.');
+      return;
+    }
+    // Ensure we have a valid GPS location; request if needed
+    if (!state.gpsPos) {
+      const location = await requestLocationWithPrompt();
+      if (!location) return; // User denied or location unavailable
+    }
     setAnchor('start', null);
     hideStartModal();
     state.durationMatrix = null;
@@ -178,10 +155,28 @@ export function showHomeModal() {
 
   const tabs = modal.querySelectorAll('#homeModeTabs .point-mode-tab');
   const sections = modal.querySelectorAll('#homeModeContent .point-mode-section');
+
+  // Disable GPS tab if unavailable or denied
+  const gpsTab = Array.from(tabs).find(t => t.dataset.mode === 'gps');
+  const gpsUnavailable = state.gpsState === 'unavailable' || state.gpsState === 'denied';
+  if (gpsTab) {
+    gpsTab.disabled = gpsUnavailable;
+    gpsTab.style.opacity = gpsUnavailable ? '0.5' : '1';
+    gpsTab.style.cursor = gpsUnavailable ? 'not-allowed' : 'pointer';
+    if (gpsUnavailable) {
+      gpsTab.title = state.gpsState === 'unavailable'
+        ? 'GPS not available on this device'
+        : 'GPS permission denied — enable in browser settings';
+    }
+  }
+
   let activeMode = 'none';
   if (state.home && state.home.isGps) activeMode = 'gps';
   else if (state.home && state.home.spotId != null) activeMode = 'stop';
   else if (state.home) activeMode = 'address';
+  // If GPS unavailable and would be default, switch to 'none' mode
+  if (gpsUnavailable && activeMode === 'gps') activeMode = 'none';
+
   tabs.forEach(t => t.classList.toggle('active', t.dataset.mode === activeMode));
   sections.forEach(s => s.classList.toggle('active', s.dataset.mode === activeMode));
 
@@ -212,9 +207,19 @@ export async function confirmHome() {
   }
 
   if (mode === 'gps') {
-    if (!state.gpsPos) {
-      toast('GPS location not available');
+    // Block if GPS unavailable
+    if (state.gpsState === 'unavailable') {
+      toast('GPS is not available on this device');
       return;
+    }
+    if (state.gpsState === 'denied') {
+      toast('GPS permission denied. Enable location services in your browser settings.');
+      return;
+    }
+    // Ensure we have a valid GPS location; request if needed
+    if (!state.gpsPos) {
+      const location = await requestLocationWithPrompt();
+      if (!location) return; // User denied or location unavailable
     }
     setAnchor('home', { lat: state.gpsPos.lat, lng: state.gpsPos.lng, label: 'Current Location', isGps: true });
     hideHomeModal();

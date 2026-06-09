@@ -1,4 +1,5 @@
 import { loadDemo } from './demo.js';
+import { state } from './state.js';
 
 const TOUR_KEY = 'routeflow-tour-complete';
 
@@ -125,9 +126,7 @@ function goBack() {
 function complete() {
   destroy();
   // Keep the demo dataset visible after the tour ends so users have something
-  // to play with — they can wipe it via the "Reset all stops" action.
-  // demoMode flag stays true so planner continues to use synthetic geometry
-  // for these placeholder coords (no OSRM round-trip needed).
+  // to play with. Real OSRM routing is already active.
   try { localStorage.setItem(TOUR_KEY, '1'); } catch {}
   if (renderCallback) {
     try { renderCallback(); } catch {}

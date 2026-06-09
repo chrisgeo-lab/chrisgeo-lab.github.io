@@ -22,17 +22,17 @@ async function solveRoute(spotIndices, color, name, matrix) {
   let orderedIndices;
   const origin = getStartLocation();
   const anchor = origin || state.home;
-  const offline = state.demoMode || state.matrixFallback;
 
   try {
     if (anchor) {
       const pts = [anchor, ...spotIndices.map(i => state.SPOTS[i])];
       let localMatrix;
-      if (offline) {
+      try {
+        const tbl = await fetchTable(pts);
+        localMatrix = tbl.durations;
+      } catch {
         localMatrix = buildHaversineMatrix(pts);
-      } else {
-        try { const tbl = await fetchTable(pts); localMatrix = tbl.durations; }
-        catch { localMatrix = buildHaversineMatrix(pts); }
+        state.matrixFallback = true; // Mark that we fell back to haversine
       }
       const n = pts.length;
       const order = tspWithMatrix([...Array(n).keys()], localMatrix, 0);
@@ -46,7 +46,8 @@ async function solveRoute(spotIndices, color, name, matrix) {
 
   const waypoints = [...(origin ? [origin] : []), ...orderedIndices.map(i => state.SPOTS[i]), ...(state.home ? [state.home] : [])];
 
-  if (offline) return syntheticRoute(orderedIndices, color, name, waypoints);
+  // Always try real routing first, fallback to synthetic only on error
+  if (state.matrixFallback) return syntheticRoute(orderedIndices, color, name, waypoints);
 
   try {
     const routeResult = await fetchRoute(waypoints);

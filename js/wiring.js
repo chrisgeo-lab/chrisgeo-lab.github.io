@@ -5,11 +5,22 @@ import { render, renderView, renderStopList, toggleVisited, computeMaxClusters,
   setSheetState, toggleRouteDropdown, closeRouteDropdown } from './ui.js';
 import { exportRoute, exportToGoogleMaps, exportToAppleMaps } from './exports.js';
 import { showHomeModal, hideHomeModal, confirmHome, showStartModal, hideStartModal, confirmStart } from './modals.js';
-import { showAddrModal, hideAddrModal, resetToDefaultStops, clearAllAppData, setupAutocomplete, parsePastedText, addManualAddress, confirmAddresses, initAddressUI, setImportMode } from './addresses.js';
+import { showAddrModal, hideAddrModal, resetToDefaultStops, clearAllAppData, setupAutocomplete, parsePastedText, addManualAddress, confirmAddresses, initAddressUI, setImportMode } from './address-manager.js';
 import { startTour, resetTour, dismissTour, isTourActive } from './tour.js';
-import { SLIDER_DEBOUNCE_MS, MOBILE_BREAKPOINT_PX, GPS_TIMEOUT_MS, DEFAULT_ZOOM_FOR_GPS } from './constants.js';
+import { requestLocationWithPrompt } from './geolocation.js';
+import { SLIDER_DEBOUNCE_MS, MOBILE_BREAKPOINT_PX, DEFAULT_ZOOM_FOR_GPS } from './constants.js';
 
 function isMobile() { return window.innerWidth < MOBILE_BREAKPOINT_PX; }
+
+function updateGPSButtonState() {
+  const btn = document.getElementById('gpsLocBtn');
+  const gpsUnavailable = state.gpsState === 'unavailable' || state.gpsState === 'denied';
+  btn.style.opacity = gpsUnavailable ? '0.3' : '1';
+  btn.style.cursor = gpsUnavailable ? 'not-allowed' : 'pointer';
+  btn.title = gpsUnavailable
+    ? (state.gpsState === 'unavailable' ? 'GPS not available' : 'GPS permission denied')
+    : 'My location';
+}
 
 function switchMobileView(view) {
   const navMap = document.getElementById('mobileNavMap');
@@ -65,10 +76,6 @@ export function initWiring() {
   };
   document.getElementById('gmapsFullRouteBtn').onclick = exportToGoogleMaps;
   document.getElementById('appleMapsBtn').onclick = exportToAppleMaps;
-  document.getElementById('nextStopCard').addEventListener('dblclick', () => {
-    const id = parseInt(document.getElementById('nextStopCard').dataset.spotId);
-    if (id) toggleVisited(id);
-  });
 
   // Panel toggle
   let panelHidden = false;
@@ -83,16 +90,22 @@ export function initWiring() {
   // Map controls
   document.getElementById('zoomInBtn').onclick = () => zoomIn();
   document.getElementById('zoomOutBtn').onclick = () => zoomOut();
-  document.getElementById('gpsLocBtn').onclick = () => {
+  document.getElementById('gpsLocBtn').onclick = async () => {
+    if (state.gpsState === 'unavailable') {
+      toast('GPS is not available on this device');
+      return;
+    }
+    if (state.gpsState === 'denied') {
+      toast('GPS permission denied. Enable location services in your browser settings.');
+      return;
+    }
     if (state.gpsPos) { setView([state.gpsPos.lat, state.gpsPos.lng], DEFAULT_ZOOM_FOR_GPS); return; }
-    if (!navigator.geolocation) { toast('GPS not available'); return; }
-    toast('Getting location...');
-    navigator.geolocation.getCurrentPosition(pos => {
-      state.gpsPos = {lat: pos.coords.latitude, lng: pos.coords.longitude, acc: pos.coords.accuracy};
-      setView([state.gpsPos.lat, state.gpsPos.lng], DEFAULT_ZOOM_FOR_GPS);
+    const location = await requestLocationWithPrompt();
+    if (location) {
+      setView([location.lat, location.lng], DEFAULT_ZOOM_FOR_GPS);
       state.suppressFitBounds = true;
       renderView();
-    }, () => toast('Location unavailable'), {enableHighAccuracy: true, timeout: GPS_TIMEOUT_MS});
+    }
   };
   document.getElementById('toggleVisitedBtn').onclick = () => {
     state.showVisitedMarkers = !state.showVisitedMarkers;
@@ -226,4 +239,8 @@ export function initWiring() {
   // Initial UI sync that depends on DOM being wired.
   document.getElementById('progressBar').style.width = `${state.SPOTS.length ? (state.visitedSet.size / state.SPOTS.length) * 100 : 0}%`;
   updateTravelModeUI();
+  updateGPSButtonState();
+
+  // Expose updateGPSButtonState for geolocation.js to call
+  window.updateGPSButtonState = updateGPSButtonState;
 }
