@@ -1,0 +1,66 @@
+}
+
+/* Loading screen */
+.app-loading{
+  position:fixed;inset:0;z-index:10000;
+  background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:20px;transition:opacity .4s ease;
+}
+.app-loading.hidden{opacity:0;pointer-events:none}
+.app-loading-icon{
+  width:56px;height:56px;border-radius:14px;
+  background:var(--blue);display:flex;align-items:center;justify-content:center;
+  box-shadow:0 8px 24px rgba(0,122,255,.25)
+}
+.app-loading-icon svg{width:28px;height:28px}
+.app-loading-text{font-size:14px;color:var(--secondary);font-weight:500}
+.app-loading-bar{
+  width:120px;height:3px;background:var(--fill);border-radius:2px;overflow:hidden
+}
+.app-loading-bar-fill{
+  height:100%;width:30%;background:var(--blue);border-radius:2px;
+  animation:loading-slide 1s ease-in-out infinite
+}
+@keyframes loading-slide{0%{transform:translateX(-100%)}100%{transform:translateX(400%)}}
+@media(prefers-color-scheme:dark){.app-loading{background:#000}}
+
+@media(max-width:767px){
+  .addr-modal{
+    max-height:92vh;max-height:92dvh;
+    max-width:calc(100vw - 16px);margin:8px;border-radius:16px
+  }
+  .addr-header{padding:18px 18px 12px}
+  .addr-header h3{font-size:18px}
+  .addr-header p{font-size:12px;margin-top:4px}
+  .addr-close-btn{width:28px;height:28px;font-size:18px}
+  .addr-tabs{padding:0 18px;gap:4px}
+  .addr-tab{padding:10px 6px}
+  .addr-tab-icon{font-size:14px}
+  .addr-tab-label{font-size:10px}
+  .addr-body{flex:1;overflow-y:auto;min-height:0;-webkit-overflow-scrolling:touch}
+  .addr-section{padding:16px 18px}
+  .addr-footer{padding:12px 18px;gap:10px}
+  .addr-footer-count{font-size:11px}
+  .addr-footer-actions{gap:6px;flex-wrap:wrap}
+  .addr-footer-btn{
+    padding:12px 14px;font-size:12px;flex:1 1 auto;min-width:0;text-align:center
+  }
+  .addr-footer-btn-danger{flex:0 0 auto}
+  .addr-preview{margin:12px 18px 0;max-height:140px;overflow-y:auto;overflow-x:hidden}
+  .addr-preview-item{padding:10px 12px;gap:8px;font-size:12px}
+  .addr-geocode-bar{padding:8px 18px}
+  .addr-mode-toggle{padding:6px 18px 0;gap:4px}
+  .addr-mode-btn{padding:7px 8px;font-size:11px}
+  .addr-search-input{font-size:16px;padding:14px}
+  .addr-field input{font-size:16px;padding:14px}
+  .addr-drop-zone{padding:28px 16px;border-radius:14px}
+  .addr-drop-zone-icon{font-size:30px;margin-bottom:8px}
+  .addr-drop-zone-text{font-size:14px}
+  .addr-drop-zone-hint{font-size:11px}
+  .addr-paste-area{min-height:80px;font-size:14px;padding:12px;border-radius:10px}
+  .addr-help-card{margin-top:12px;padding:10px 12px}
+  .addr-action-btn{padding:14px;font-size:14px;border-radius:10px}
+}
+
+/* TODO: extract inline marker styles from ui.js into .marker--start, .marker--home, .marker--visited classes here */

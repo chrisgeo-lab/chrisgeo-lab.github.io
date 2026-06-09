@@ -1,0 +1,64 @@
+/* Map: container, markers, controls, popups, GPS dot */
+
+#map{position:fixed;inset:0;z-index:1;pointer-events:auto;touch-action:none}
+#map .maplibregl-canvas-container,#map .maplibregl-canvas{pointer-events:auto !important}
+/* Marker wrapper allows pan/zoom to work — clicks still hit the visible circle */
+#map .maplibregl-marker{pointer-events:none}
+#map .maplibregl-marker>*{pointer-events:auto}
+.maplibregl-ctrl-bottom-left,.maplibregl-ctrl-bottom-right,
+.maplibregl-ctrl-top-left,.maplibregl-ctrl-top-right{display:none !important}
+
+/* Floating map controls */
+.map-controls{
+  position:fixed;right:16px;z-index:900;display:flex;flex-direction:column;gap:0;
+  border-radius:14px;overflow:hidden;
+  box-shadow:0 4px 24px rgba(0,0,0,.1),0 1px 4px rgba(0,0,0,.06);
+  top:50%;transform:translateY(-50%)
+}
+.map-ctrl-btn{
+  width:44px;height:44px;background:var(--card-solid);border:none;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--text);
+  transition:all .15s;position:relative
+}
+.map-ctrl-btn:hover{background:var(--fill);color:var(--blue)}
+.map-ctrl-btn:active{background:rgba(0,122,255,.08);transform:scale(.9)}
+.map-ctrl-btn+.map-ctrl-btn{border-top:1px solid var(--separator)}
+#gpsLocBtn{font-size:16px}
+#toggleVisitedBtn{font-size:14px;opacity:.5}
+#manageStopsBtn{font-size:15px}
+#tourBtn{font-size:14px;font-weight:700;color:var(--blue)}
+
+/* MapLibre popups */
+.maplibregl-popup-content{
+  border-radius:14px!important;box-shadow:0 8px 32px rgba(0,0,0,.15)!important;padding:0!important;
+  background:var(--card-solid)!important;color:var(--text)!important
+}
+.maplibregl-popup-tip{border-top-color:var(--card-solid)!important}
+.maplibregl-popup-anchor-bottom .maplibregl-popup-tip{border-top-color:var(--card-solid)!important;border-bottom-color:transparent!important}
+.maplibregl-popup-anchor-top .maplibregl-popup-tip{border-bottom-color:var(--card-solid)!important;border-top-color:transparent!important}
+.maplibregl-popup-anchor-left .maplibregl-popup-tip{border-right-color:var(--card-solid)!important;border-left-color:transparent!important}
+.maplibregl-popup-anchor-right .maplibregl-popup-tip{border-left-color:var(--card-solid)!important;border-right-color:transparent!important}
+.maplibregl-popup-close-button{font-size:18px;padding:4px 8px;color:var(--secondary)}
+.maplibregl-popup-close-button:hover{color:var(--text);background:var(--fill);border-radius:50%}
+.stop-popup{padding:14px 16px;font-family:var(--font)}
+.stop-popup-label{font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase}
+.stop-popup-street{font-size:15px;font-weight:700;margin-top:4px;color:var(--text);letter-spacing:-.01em}
+.stop-popup-addr{font-size:12px;color:var(--secondary);margin-top:2px}
+.stop-popup-leg{font-size:11px;color:var(--secondary);margin-top:8px;padding-top:8px;border-top:1px solid var(--separator)}
+.stop-popup-btn{
+  margin-top:10px;width:100%;padding:10px;border-radius:10px;border:none;
+  font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;
+  font-family:var(--font)
+}
+.stop-popup-btn:active{opacity:.7;transform:scale(.97)}
+.stop-popup-btn-visit{background:#34C759;color:#fff}
+.stop-popup-btn-unvisit{background:var(--fill);color:var(--text)}
+
+/* GPS dot (live geolocation marker) */
+.gps-dot{width:20px;height:20px;position:relative;display:flex;align-items:center;justify-content:center}
+.gps-dot-core{width:12px;height:12px;border-radius:50%;background:var(--blue);position:absolute}
+.gps-dot-ring{
+  width:20px;height:20px;border-radius:50%;background:rgba(0,122,255,.25);position:absolute;
+  animation:gps-pulse 1.4s ease-out infinite
+}
+@keyframes gps-pulse{0%{transform:scale(.8);opacity:.6}100%{transform:scale(1.8);opacity:0}}

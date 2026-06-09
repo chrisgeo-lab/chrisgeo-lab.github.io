@@ -1,0 +1,57 @@
+/* Base: CSS variables, resets, scrollbar, root/body styles */
+
+*{box-sizing:border-box;margin:0;padding:0}
+*::-webkit-scrollbar{width:6px;height:6px}
+*::-webkit-scrollbar-track{background:transparent}
+*::-webkit-scrollbar-thumb{background:var(--tertiary);border-radius:3px;transition:background .2s}
+*::-webkit-scrollbar-thumb:hover{background:var(--secondary)}
+*{scrollbar-width:thin;scrollbar-color:var(--tertiary) transparent}
+
+:root{
+  --bg:#fff;--card:rgba(255,255,255,.97);--card-solid:#fff;
+  --text:#1d1d1f;--secondary:#6e6e73;--tertiary:#aeaeb2;
+  --separator:rgba(60,60,67,.12);--fill:rgba(120,120,128,.12);
+  --blue:#007AFF;--green:#34C759;--orange:#FF9500;--red:#FF3B30;
+  --purple:#AF52DE;--pink:#FF2D55;--teal:#5AC8FA;--indigo:#5856D6;
+  --shadow:0 2px 20px rgba(0,0,0,.08);--shadow-lg:0 8px 40px rgba(0,0,0,.12);
+  --radius:16px;--radius-sm:12px;--radius-xs:8px;
+  --font:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',Roboto,sans-serif;
+  --mono:'SF Mono',SFMono-Regular,Menlo,Consolas,monospace;
+}
+
+@media(prefers-color-scheme:dark){
+  :root{
+    --bg:#1c1c1e;--card:rgba(44,44,46,.97);--card-solid:#2c2c2e;
+    --text:#f5f5f7;--secondary:#98989d;--tertiary:#636366;
+    --separator:rgba(84,84,88,.36);--fill:rgba(120,120,128,.24);
+    --shadow:0 2px 20px rgba(0,0,0,.3);--shadow-lg:0 8px 40px rgba(0,0,0,.4);
+  }
+}
+
+:root[data-theme="dark"]{
+  --bg:#1c1c1e;--card:rgba(44,44,46,.97);--card-solid:#2c2c2e;
+  --text:#f5f5f7;--secondary:#98989d;--tertiary:#636366;
+  --separator:rgba(84,84,88,.36);--fill:rgba(120,120,128,.24);
+  --shadow:0 2px 20px rgba(0,0,0,.3);--shadow-lg:0 8px 40px rgba(0,0,0,.4);
+}
+
+:root[data-theme="light"]{
+  --bg:#fff;--card:rgba(255,255,255,.97);--card-solid:#fff;
+  --text:#1d1d1f;--secondary:#6e6e73;--tertiary:#aeaeb2;
+  --separator:rgba(60,60,67,.12);--fill:rgba(120,120,128,.12);
+  --shadow:0 2px 20px rgba(0,0,0,.08);--shadow-lg:0 8px 40px rgba(0,0,0,.12);
+}
+
+body{
+  font-family:var(--font);background:#f2f2f7;color:var(--text);
+  height:100vh;height:100dvh;overflow:hidden;position:relative;
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  -webkit-tap-highlight-color:transparent;-webkit-touch-callout:none
+}
+
+#map{user-select:auto}
+.bottom-sheet,.top-bar,.map-controls,.mobile-nav,.modal-overlay,.tour-tooltip{user-select:none}
+
+@media(prefers-color-scheme:dark){body{background:#000}}
+:root[data-theme="dark"] body{background:#000}
+:root[data-theme="light"] body{background:#f2f2f7}
