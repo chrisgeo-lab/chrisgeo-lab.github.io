@@ -358,7 +358,7 @@ body{
   position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(.9);
   background:rgba(0,0,0,.82);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);
   color:#fff;padding:14px 22px;border-radius:14px;
-  font-size:14px;font-weight:600;z-index:3000;opacity:0;
+  font-size:14px;font-weight:600;z-index:4000;opacity:0;
   transition:all .3s cubic-bezier(.2,.8,.2,1);pointer-events:none;
   max-width:320px;text-align:center;display:flex;align-items:center;gap:12px;
   letter-spacing:-.01em
