@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MapLibre Test - Marker Interaction</title>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<style>
+body{margin:0;font-family:system-ui}
+#map{position:fixed;inset:0}
+#map .maplibregl-marker{pointer-events:none}
+#map .maplibregl-marker>*{pointer-events:auto}
+#info{position:fixed;top:10px;left:10px;background:white;padding:15px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.2);z-index:1000;max-width:300px}
+button{margin:5px;padding:8px 16px;cursor:pointer}
+.status{margin-top:10px;padding:8px;background:#f0f0f0;border-radius:4px;font-size:12px}
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="info">
+  <h3>MapLibre Pan/Zoom Test</h3>
+  <button onclick="addMarkers()">Add 10 Markers</button>
+  <button onclick="clearMarkers()">Clear Markers</button>
+  <button onclick="testInteraction()">Test Pan (should move map)</button>
+  <div class="status" id="status">Click "Add Markers" then try to pan/zoom the map</div>
+</div>
+
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script>
+const map = new maplibregl.Map({
+  container: 'map',
+  style: 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json',
+  center: [-122.4, 37.8],
+  zoom: 12
+});
+
+const markers = [];
+
+function log(msg) {
+  document.getElementById('status').textContent = msg;
+  console.log(msg);
+}
+
+function addMarkers() {
+  clearMarkers();
+  for (let i = 0; i < 10; i++) {
+    const lat = 37.8 + (Math.random() - 0.5) * 0.1;
+    const lng = -122.4 + (Math.random() - 0.5) * 0.1;
+
+    const el = document.createElement('div');
+    el.innerHTML = `<div style="width:24px;height:24px;background:#007AFF;border:2px solid white;border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-size:10px;font-weight:bold;box-shadow:0 2px 4px rgba(0,0,0,.3)">${i+1}</div>`;
+    el.style.cursor = 'pointer';
+
+    const marker = new maplibregl.Marker({element: el, anchor: 'center'})
+      .setLngLat([lng, lat])
+      .addTo(map);
+
+    el.onclick = () => {
+      log(`Marker ${i+1} clicked!`);
+      new maplibregl.Popup({offset: 12})
+        .setLngLat([lng, lat])
+        .setHTML(`<div style="padding:10px">Marker ${i+1}<br>Lat: ${lat.toFixed(4)}<br>Lng: ${lng.toFixed(4)}</div>`)
+        .addTo(map);
+    };
+
+    markers.push(marker);
+  }
+  log(`Added ${markers.length} markers. Try panning/zooming the map now.`);
+}
+
+function clearMarkers() {
+  markers.forEach(m => m.remove());
+  markers.length = 0;
+  log('Markers cleared');
+}
+
+function testInteraction() {
+  const center = map.getCenter();
+  map.easeTo({center: [center.lng + 0.01, center.lat], duration: 500});
+  log('Map should move east. If it moved, pan/zoom is working!');
+}
+
+map.on('move', () => {
+  const c = map.getCenter();
+  console.log('Map moved:', c.lng.toFixed(4), c.lat.toFixed(4));
+});
+
+map.on('zoom', () => {
+  console.log('Map zoom:', map.getZoom().toFixed(2));
+});
+
+log('Map loaded. Add markers to test interaction.');
+</script>
+</body>
+</html>

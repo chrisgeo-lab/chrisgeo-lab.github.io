@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RouteFlow Diagnostics</title>
+<style>
+body{font-family:system-ui;max-width:800px;margin:20px auto;padding:20px;line-height:1.6}
+h1{color:#007AFF}
+.test{margin:20px 0;padding:15px;background:#f5f5f5;border-radius:8px}
+.pass{background:#d4edda;color:#155724}
+.fail{background:#f8d7da;color:#721c24}
+.info{background:#d1ecf1;color:#0c5460}
+code{background:#f0f0f0;padding:2px 6px;border-radius:3px;font-size:90%}
+button{padding:10px 20px;background:#007AFF;color:white;border:none;border-radius:6px;cursor:pointer;margin:5px}
+button:hover{background:#0051D5}
+#results{margin-top:20px}
+</style>
+</head>
+<body>
+<h1>🔍 RouteFlow Diagnostics</h1>
+<p>Run these tests to diagnose issues with the live site.</p>
+
+<button onclick="runAllTests()">Run All Tests</button>
+<button onclick="location.href='/'">← Back to App</button>
+<button onclick="location.href='/clear-cache.html'">Clear Cache</button>
+
+<div id="results"></div>
+
+<script>
+const results = document.getElementById('results');
+
+function log(html, className = 'info') {
+  const div = document.createElement('div');
+  div.className = 'test ' + className;
+  div.innerHTML = html;
+  results.appendChild(div);
+}
+
+async function runAllTests() {
+  results.innerHTML = '<h2>Running Tests...</h2>';
+
+  // Test 1: Check which files are loaded
+  log('<h3>1. Checking CSS Files</h3>');
+  const stylesheets = Array.from(document.styleSheets);
+  const cssFiles = stylesheets.filter(s => s.href && s.href.includes('css/'));
+  if (cssFiles.length >= 7) {
+    log(`✓ Found ${cssFiles.length} CSS modules loaded:<br>${cssFiles.map(s => '  • ' + s.href.split('/').pop()).join('<br>')}`, 'pass');
+  } else {
+    log(`❌ Only ${cssFiles.length} CSS files loaded (expected 8)`, 'fail');
+  }
+
+  // Test 2: Check service worker version
+  log('<h3>2. Checking Service Worker</h3>');
+  if ('serviceWorker' in navigator) {
+    const regs = await navigator.serviceWorker.getRegistrations();
+    if (regs.length > 0) {
+      const sw = regs[0];
+      log(`✓ Service worker registered<br>Scope: <code>${sw.scope}</code><br>State: <code>${sw.active?.state || 'unknown'}</code>`, 'pass');
+
+      // Fetch SW to check version
+      const swCode = await fetch('/sw.js').then(r => r.text());
+      const match = swCode.match(/CACHE_NAME = '([^']+)'/);
+      if (match) {
+        log(`Cache version: <code>${match[1]}</code> (should be v29 or higher)`, match[1] >= 'routeflow-v29' ? 'pass' : 'info');
+      }
+    } else {
+      log('❌ No service worker registered', 'fail');
+    }
+  } else {
+    log('❌ Service workers not supported', 'fail');
+  }
+
+  // Test 3: Check localStorage
+  log('<h3>3. Checking localStorage</h3>');
+  const keys = Object.keys(localStorage).filter(k => k.startsWith('routeflow'));
+  if (keys.length > 0) {
+    log(`Found ${keys.length} RouteFlow keys:<br>${keys.map(k => {
+      const val = localStorage.getItem(k);
+      const preview = val ? (val.length > 50 ? val.substring(0, 50) + '...' : val) : '(empty)';
+      return `  • <code>${k}</code>: ${preview}`;
+    }).join('<br>')}`, 'info');
+  } else {
+    log('✓ localStorage is clean (no RouteFlow data)', 'pass');
+  }
+
+  // Test 4: Check if CSS rule exists
+  log('<h3>4. Checking Marker CSS Rule</h3>');
+  let foundRule = false;
+  for (const sheet of stylesheets) {
+    try {
+      const rules = sheet.cssRules || sheet.rules;
+      if (!rules) continue;
+      for (const rule of rules) {
+        if (rule.selectorText && rule.selectorText.includes('maplibregl-marker') && rule.style.pointerEvents) {
+          foundRule = true;
+          log(`✓ Found rule: <code>${rule.selectorText} { pointer-events: ${rule.style.pointerEvents}; }</code>`, 'pass');
+        }
+      }
+    } catch (e) {
+      // CORS or other error
+    }
+  }
+  if (!foundRule) {
+    log('❌ Marker pointer-events rule not found in CSS', 'fail');
+  }
+
+  // Test 5: Check MapLibre loaded
+  log('<h3>5. Checking MapLibre</h3>');
+  if (typeof maplibregl !== 'undefined') {
+    log(`✓ MapLibre GL loaded (version ${maplibregl.version || 'unknown'})`, 'pass');
+  } else {
+    log('❌ MapLibre GL not loaded', 'fail');
+  }
+
+  // Test 6: Browser info
+  log('<h3>6. Browser Information</h3>');
+  log(`User Agent: <code>${navigator.userAgent}</code><br>
+       Screen: ${screen.width}×${screen.height}<br>
+       Viewport: ${window.innerWidth}×${window.innerHeight}<br>
+       Touch: ${navigator.maxTouchPoints > 0 ? 'Yes' : 'No'}`, 'info');
+
+  log('<h2>✅ Diagnostic Complete</h2>', 'pass');
+}
+
+// Auto-run on load
+setTimeout(runAllTests, 100);
+</script>
+</body>
+</html>
