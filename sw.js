@@ -1,10 +1,17 @@
 // Bump CACHE_NAME on every release that changes static assets.
-const CACHE_NAME = 'routeflow-v26';
+const CACHE_NAME = 'routeflow-v28';
 const STATIC_ASSETS = [
   './',
   './index.html',
   './manifest.json',
-  './css/styles.css',
+  './css/base.css',
+  './css/map.css',
+  './css/layout.css',
+  './css/components.css',
+  './css/modals.css',
+  './css/tour.css',
+  './css/responsive.css',
+  './css/loading.css',
   './js/fallback.js',
   './js/app.js',
   './js/state.js',
