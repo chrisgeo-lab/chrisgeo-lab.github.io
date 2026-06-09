@@ -19,6 +19,7 @@
   pointer-events:none
 }
 .top-bar>*{pointer-events:auto}
+.top-brand{display:flex;align-items:center;gap:8px;flex-shrink:0}
 .top-card{
   background:var(--card);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);
   border-radius:var(--radius-sm);padding:10px 14px;cursor:pointer;
@@ -45,7 +46,7 @@
 .cluster-card{
   background:var(--card);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);
   border-radius:var(--radius-sm);padding:10px 16px;display:flex;align-items:center;gap:8px;
-  box-shadow:var(--shadow);flex-shrink:0;order:10
+  box-shadow:var(--shadow);flex-shrink:0;order:10;margin-right:420px
 }
 .cluster-card label{font-size:13px;color:var(--secondary);font-weight:600;white-space:nowrap}
 .cluster-card input[type=range]{
