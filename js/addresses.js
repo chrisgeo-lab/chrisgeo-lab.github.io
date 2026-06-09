@@ -312,6 +312,29 @@ export function resetToDefaultStops() {
   render();
 }
 
+/**
+ * Nuclear option: wipe ALL localStorage including tour state, anchors, cache, visited set.
+ * Use this when cache corruption causes persistent bugs across sessions.
+ */
+export function clearAllAppData() {
+  if (!confirm('Clear ALL app data (stops, progress, tour state, cache)? This cannot be undone.')) return;
+  // Enumerate all routeflow keys explicitly to avoid nuking unrelated localStorage.
+  const keys = [
+    STORE_SPOTS, STORE_V, 'routeflow-home', 'routeflow-start',
+    STORE_CACHE, 'routeflow-travel-mode', 'routeflow-tour-complete', 'routeflow-theme'
+  ];
+  keys.forEach(k => { try { localStorage.removeItem(k); } catch {} });
+  // Reset in-memory state.
+  state.SPOTS = []; state.visitedSet.clear(); state.durationMatrix = null;
+  state.osrmCache = {}; state.currentRoutes = []; state.demoMode = false;
+  state.matrixFallback = false; state.startPoint = null; state.home = null;
+  state.numClusters = 1; state.activeFilter = -1;
+  document.getElementById('clusterSlider').value = 1;
+  document.getElementById('clusterVal').textContent = '1';
+  toast('All data cleared — refresh to see tour again');
+  render();
+}
+
 // Fix failed address prompt
 function showFixAddrPrompt(addr) {
   return new Promise(resolve => {

@@ -93,7 +93,9 @@ export function clearMap() {
       if (map.getLayer(id + '-outline')) map.removeLayer(id + '-outline');
       if (map.getLayer(id)) map.removeLayer(id);
       if (map.getSource(id)) map.removeSource(id);
-    } catch {}
+    } catch (e) {
+      console.warn('clearMap: failed to remove route layer/source', id, e);
+    }
   });
   routeSources = [];
   routeData = [];

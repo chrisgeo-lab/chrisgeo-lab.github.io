@@ -5,7 +5,7 @@ import { render, renderView, renderStopList, toggleVisited, computeMaxClusters,
   setSheetState, toggleRouteDropdown, closeRouteDropdown } from './ui.js';
 import { exportRoute, exportToGoogleMaps, exportToAppleMaps } from './exports.js';
 import { showHomeModal, hideHomeModal, confirmHome, showStartModal, hideStartModal, confirmStart } from './modals.js';
-import { showAddrModal, hideAddrModal, resetToDefaultStops, setupAutocomplete, parsePastedText, addManualAddress, confirmAddresses, initAddressUI, setImportMode } from './addresses.js';
+import { showAddrModal, hideAddrModal, resetToDefaultStops, clearAllAppData, setupAutocomplete, parsePastedText, addManualAddress, confirmAddresses, initAddressUI, setImportMode } from './addresses.js';
 import { startTour, resetTour, dismissTour, isTourActive } from './tour.js';
 import { SLIDER_DEBOUNCE_MS, MOBILE_BREAKPOINT_PX, GPS_TIMEOUT_MS, DEFAULT_ZOOM_FOR_GPS } from './constants.js';
 
@@ -157,6 +157,7 @@ export function initWiring() {
   });
   document.getElementById('addrConfirmBtn').onclick = confirmAddresses;
   document.getElementById('addrResetDefaultBtn').onclick = resetToDefaultStops;
+  document.getElementById('addrClearDataBtn').onclick = clearAllAppData;
   document.getElementById('addrModeAppend').onclick = () => setImportMode('append');
   document.getElementById('addrModeReplace').onclick = () => setImportMode('replace');
 
