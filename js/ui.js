@@ -355,8 +355,15 @@ function updateEmptyState() {
     topBar.style.display = 'none';
   } else {
     empty.style.display = 'none'; stopsView.style.display = '';
+    // Releasing the empty-state expanded sheet — otherwise on mobile it
+    // covers the entire map (markers rendered behind a fullscreen panel)
+    // and on desktop fitBounds measures stale canvas dimensions.
+    sheet.classList.remove('expanded');
+    if (state.sheetState === 'expanded') state.sheetState = 'peek';
     fab.classList.remove('show');
     topBar.style.display = '';
+    // Force a MapLibre canvas resize since the sheet just changed size.
+    requestAnimationFrame(() => { try { map.resize(); } catch {} });
   }
 }
 

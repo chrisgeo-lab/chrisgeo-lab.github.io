@@ -15,6 +15,9 @@ function resetRouteState() {
   state.durationMatrix = null;
   state.osrmCache = {}; saveJSON(STORE_CACHE, state.osrmCache);
   state.currentRoutes = [];
+  // User is bringing real addresses — leave demo mode so OSRM is used.
+  state.demoMode = false;
+  state.matrixFallback = false;
 }
 
 function updateClusterSlider() {

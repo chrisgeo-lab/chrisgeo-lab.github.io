@@ -4,7 +4,7 @@
 
 import { state } from './state.js';
 import { buildHaversineMatrix } from './routing.js';
-import { fitBounds } from './map.js';
+import { fitBounds, map } from './map.js';
 import { DEMO_FIT_PADDING } from './constants.js';
 
 export const DEMO_SPOTS = [
@@ -82,8 +82,13 @@ export function loadDemo(renderFn) {
   Promise.resolve(renderFn()).catch(e => console.error('Demo render failed:', e));
 
   // Frame the demo on the next paint regardless of route resolution.
+  // Two rAFs so the empty-state-collapsing CSS transition has settled and
+  // the map canvas has its post-empty-state dimensions before fitBounds runs.
   requestAnimationFrame(() => {
-    fitBounds(DEMO_SPOTS.map(s => [s.lat, s.lng]), {padding: DEMO_FIT_PADDING});
+    requestAnimationFrame(() => {
+      try { map.resize(); } catch {}
+      fitBounds(DEMO_SPOTS.map(s => [s.lat, s.lng]), {padding: DEMO_FIT_PADDING});
+    });
   });
 }
 

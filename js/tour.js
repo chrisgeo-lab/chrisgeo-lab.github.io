@@ -1,5 +1,4 @@
-import { state } from './state.js';
-import { loadDemo, restoreFromDemo, isDemoActive } from './demo.js';
+import { loadDemo } from './demo.js';
 
 const TOUR_KEY = 'routeflow-tour-complete';
 
@@ -56,7 +55,7 @@ const steps = [
   {
     id: 'done',
     title: 'You\'re All Set!',
-    body: 'Keyboard shortcuts: H = set end point, +/− = zoom, 1–9 = switch routes, ? = replay this tour anytime. The demo data will clear when you close this.',
+    body: 'Keyboard shortcuts: H = set end point, +/− = zoom, 1–9 = switch routes, ? = replay this tour anytime. The demo data stays loaded — clear it any time from the address manager.',
     target: null,
     position: 'center'
   }
@@ -125,8 +124,14 @@ function goBack() {
 
 function complete() {
   destroy();
-  if (isDemoActive() && renderCallback) restoreFromDemo(renderCallback);
+  // Keep the demo dataset visible after the tour ends so users have something
+  // to play with — they can wipe it via the "Reset all stops" action.
+  // demoMode flag stays true so planner continues to use synthetic geometry
+  // for these placeholder coords (no OSRM round-trip needed).
   try { localStorage.setItem(TOUR_KEY, '1'); } catch {}
+  if (renderCallback) {
+    try { renderCallback(); } catch {}
+  }
 }
 
 // Update the SVG mask so the dimmed backdrop has a "hole" cut out around
