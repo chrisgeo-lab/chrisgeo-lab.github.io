@@ -1,5 +1,5 @@
 // Bump CACHE_NAME on every release that changes static assets.
-const CACHE_NAME = 'routeflow-v44';
+const CACHE_NAME = 'routeflow-v105';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -23,8 +23,9 @@ const STATIC_ASSETS = [
   './js/ui.js',
   './js/exports.js',
   './js/modals.js',
-  './js/addresses.js',
   './js/address-parse.js',
+  './js/addr-fix-modal.js',
+  './js/addr-autocomplete.js',
   './js/anchors.js',
   './js/photon.js',
   './js/import-parsers.js',
@@ -43,6 +44,10 @@ const STATIC_ASSETS = [
   './js/address-manager.js',
   './js/ui-panels.js',
   './js/modal-helpers.js',
+  './js/confirm.js',
+  './js/stop-list-render.js',
+  './js/share.js',
+  './js/quick-add.js',
   'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js',
   'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css'
 ];

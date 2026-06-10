@@ -47,17 +47,33 @@
 </div>
 
 <div id="map" role="application" aria-label="Route map"></div>
-<div class="progress-bar"><div class="progress-bar-fill" id="progressBar" style="width:0%"></div></div>
 <div class="loading-indicator" id="loading"></div>
 
 <!-- Map controls -->
 <div class="map-controls" role="toolbar" aria-label="Map controls">
-  <button class="map-ctrl-btn" id="zoomInBtn" title="Zoom in" aria-label="Zoom in">+</button>
-  <button class="map-ctrl-btn" id="zoomOutBtn" title="Zoom out" aria-label="Zoom out">&minus;</button>
-  <button class="map-ctrl-btn" id="gpsLocBtn" title="My location" aria-label="Show my GPS location">&#9678;</button>
-  <button class="map-ctrl-btn" id="toggleVisitedBtn" title="Show visited" aria-label="Toggle visited stops on map">&#10003;</button>
-  <button class="map-ctrl-btn" id="manageStopsBtn" title="Import stops" aria-label="Import or manage stop addresses">&#8862;</button>
+  <button class="map-ctrl-btn" id="zoomInBtn" title="Zoom in" aria-label="Zoom in">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10"/></svg>
+  </button>
+  <button class="map-ctrl-btn" id="zoomOutBtn" title="Zoom out" aria-label="Zoom out">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 8h10"/></svg>
+  </button>
+  <button class="map-ctrl-btn" id="gpsLocBtn" title="My location" aria-label="Show my GPS location">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="2.2" fill="currentColor"/><circle cx="8" cy="8" r="5.4"/><path d="M8 .8v2.2M8 13v2.2M.8 8h2.2M13 8h2.2"/></svg>
+  </button>
+  <button class="map-ctrl-btn" id="toggleVisitedBtn" title="Show visited" aria-label="Toggle visited stops on map">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8.5l3 3 7-7"/></svg>
+  </button>
+  <button class="map-ctrl-btn" id="manageStopsBtn" title="Bulk import (paste / file)" aria-label="Open bulk import for stops">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v7M5 6l3 3 3-3M2.5 11.5v1a1 1 0 001 1h9a1 1 0 001-1v-1"/></svg>
+  </button>
   <button class="map-ctrl-btn" id="tourBtn" title="Show tour" aria-label="Show guided tour">?</button>
+</div>
+
+<!-- Vertical cluster control for mobile (below map controls) -->
+<div class="cluster-vertical" id="clusterVertical" style="display:none">
+  <div class="cluster-vertical-label">Routes</div>
+  <input type="range" id="clusterSliderMobile" min="1" max="1" value="1" orient="vertical" aria-label="Number of route splits">
+  <div class="cluster-vertical-val" id="clusterValMobile">1</div>
 </div>
 
 <div class="kbd-hint">Esc: close &middot; H: end point &middot; +/-: zoom &middot; 1-9: route &middot; ?: tour</div>
@@ -65,10 +81,9 @@
 <!-- Top bar -->
 <div class="top-bar">
   <div class="top-brand">
-    <div class="top-card" id="topCard">
+    <div class="top-card" id="topCard" role="button" tabindex="0" aria-label="Toggle planning panel">
       <div>
         <div class="top-title">RouteFlow</div>
-        <div class="top-subtitle" id="topSubtitle">Calculating route...</div>
       </div>
     </div>
     <button class="theme-card" id="themeToggleBtn" aria-label="Toggle dark mode" title="Toggle dark mode">
@@ -76,7 +91,7 @@
     </button>
   </div>
   <div class="top-spacer"></div>
-  <div class="cluster-card">
+  <div class="cluster-card" id="clusterCardDesktop">
     <label>Split into</label>
     <input type="range" id="clusterSlider" min="1" max="1" value="1" aria-label="Number of route splits">
     <span class="val" id="clusterVal">1</span>
@@ -85,50 +100,67 @@
 </div>
 
 <!-- Panel toggle -->
-<button class="panel-toggle" id="panelToggle" title="Toggle panel" aria-label="Collapse or expand side panel">&#9654;</button>
+<button class="panel-toggle" id="panelToggle" title="Toggle panel" aria-label="Collapse or expand side panel">
+  <svg viewBox="0 0 12 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4l4 4-4 4"/></svg>
+</button>
 
 <!-- Bottom sheet -->
 <div class="bottom-sheet" id="bottomSheet">
   <div class="sheet-handle-area" id="sheetHandle"><div class="sheet-handle"></div></div>
   <div class="route-settings-card" id="routeSettingsCard" style="display:none">
     <div class="route-settings-section">
-      <div class="route-settings-label">Route Points</div>
       <div class="route-settings-actions">
         <button class="route-settings-btn" id="setStartBtn" aria-label="Set route start point" title="Where to begin routing (default: GPS location)">
-          <span style="font-size:14px">&#9654;</span>
+          <svg viewBox="0 0 14 14" fill="currentColor" aria-hidden="true"><path d="M3.5 2.5v9l8-4.5z"/></svg>
           <span>Start Point</span>
         </button>
         <button class="route-settings-btn" id="setHomeBtn" aria-label="Set route end point" title="Optional return destination after all stops">
-          <span style="font-size:14px">&#9632;</span>
+          <svg viewBox="0 0 14 14" fill="currentColor" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="1.2"/></svg>
           <span>End Point</span>
         </button>
       </div>
     </div>
     <div class="route-settings-section" id="exportSection" style="display:none">
-      <div class="route-settings-label">Export for Navigation</div>
       <div class="route-settings-actions">
-        <button id="gmapsFullRouteBtn" class="export-btn export-btn-google">
-          <span style="font-size:16px">&#128279;</span>
-          <span>Google Maps</span>
+        <button id="gmapsFullRouteBtn" class="export-btn export-btn-google" aria-label="Open in Google Maps">
+          <svg class="brand-logo brand-logo-google" viewBox="0 0 24 24" aria-hidden="true">
+            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+          </svg>
+          <span>Maps</span>
         </button>
-        <button id="appleMapsBtn" class="export-btn export-btn-apple">
-          <span style="font-size:16px">&#128279;</span>
-          <span>Apple Maps</span>
+        <button id="appleMapsBtn" class="export-btn export-btn-apple" aria-label="Open in Apple Maps">
+          <svg class="brand-logo brand-logo-apple" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
+          </svg>
+          <span>Maps</span>
+        </button>
+        <button id="shareRouteBtn" class="export-btn export-btn-share" aria-label="Share route via link">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="4" cy="8" r="1.8"/><circle cx="12" cy="4" r="1.8"/><circle cx="12" cy="12" r="1.8"/><path d="M5.6 7.1l4.8-2.4M5.6 8.9l4.8 2.4"/></svg>
+          <span>Share</span>
         </button>
       </div>
     </div>
   </div>
   <div class="travel-mode-bar" id="travelModeBar">
     <button class="travel-mode-btn active" data-mode="car" aria-label="Driving">
-      <span class="travel-mode-icon">&#128663;</span>
+      <span class="travel-mode-icon">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 10.5h11M3.5 10.5V8l1.4-3.2a1.5 1.5 0 011.4-.9h3.4a1.5 1.5 0 011.4.9L12.5 8v2.5M3.5 10.5v1.7M12.5 10.5v1.7"/><circle cx="5" cy="10.5" r=".9" fill="currentColor"/><circle cx="11" cy="10.5" r=".9" fill="currentColor"/></svg>
+      </span>
       <span class="travel-mode-label">Drive</span>
     </button>
     <button class="travel-mode-btn" data-mode="bike" aria-label="Cycling">
-      <span class="travel-mode-icon">&#128690;</span>
+      <span class="travel-mode-icon">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="4" cy="11" r="2.5"/><circle cx="12" cy="11" r="2.5"/><path d="M4 11l3-5h3M9 6l3 5M7 6l1.5 2.5M10 4.5h1.5"/></svg>
+      </span>
       <span class="travel-mode-label">Bike</span>
     </button>
     <button class="travel-mode-btn" data-mode="walk" aria-label="Walking">
-      <span class="travel-mode-icon">&#128694;</span>
+      <span class="travel-mode-icon">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="2.8" r="1.3"/><path d="M9.2 4.3l-2 3.5 2 1.5v4M7.2 7.8L5 6.5M11.5 9.3l1.5 1M5.5 13.5l1.7-2.5"/></svg>
+      </span>
       <span class="travel-mode-label">Walk</span>
     </button>
   </div>
@@ -139,6 +171,14 @@
       <div class="route-stat"><div class="route-stat-val" id="statStops">--</div><div class="route-stat-label">Stops</div></div>
     </div>
   </div>
+  <div class="cluster-panel-control" id="clusterPanelControl" style="display:none">
+    <div class="cluster-panel-label">Split into <span id="clusterPanelVal">1</span> routes</div>
+    <div class="cluster-panel-slider">
+      <button class="cluster-btn" id="clusterDecrease" aria-label="Decrease routes">-</button>
+      <input type="range" id="clusterSliderPanel" min="1" max="1" value="1" aria-label="Number of route splits">
+      <button class="cluster-btn" id="clusterIncrease" aria-label="Increase routes">+</button>
+    </div>
+  </div>
   <div class="filter-row" id="filterRow">
     <div class="route-dropdown-trigger" id="routeDropdownTrigger"></div>
     <div class="route-dropdown-menu" id="routeDropdownMenu"></div>
@@ -146,39 +186,60 @@
   <div class="sheet-sticky">
     <div class="search-bar" id="searchBar">
       <div class="search-wrap">
-        <span class="search-icon">&#128269;</span>
+        <span class="search-icon">
+          <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="6" cy="6" r="4"/><path d="M9 9l3.2 3.2"/></svg>
+        </span>
         <input type="text" class="search-input" id="searchInput" placeholder="Search stops..." aria-label="Search stops by street or city">
       </div>
     </div>
     <div id="errorBanner" style="display:none"></div>
     <div id="stopsInfoBadge" class="stops-info-badge">
       <span id="stopsInfoText"></span>
-      <button id="importStopsInlineBtn" class="badge-btn" aria-label="Import or edit stops" style="margin-left:auto">Import / Edit</button>
+      <button id="importStopsInlineBtn" class="badge-btn" aria-label="Import stops from a file, paste, or typed list" style="margin-left:auto">Import</button>
       <button id="resetBtn" class="badge-btn-danger" aria-label="Reset all visited progress">Reset</button>
     </div>
   </div>
   <div class="sheet-content" id="sheetContent">
     <div class="stops-view active" id="stopsView"></div>
     <div class="empty-state" id="emptyState" style="display:none">
-      <div class="empty-state-icon">&#128205;</div>
+      <div class="empty-state-icon">
+        <svg viewBox="0 0 30 30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 27s9-9 9-15a9 9 0 10-18 0c0 6 9 15 9 15z"/><circle cx="15" cy="12" r="3"/></svg>
+      </div>
       <div class="empty-state-title">No stops yet</div>
       <div class="empty-state-text">Import a spreadsheet or add addresses to get started.</div>
-      <button id="emptyImportBtn" class="empty-state-btn">&#43; Add Stops</button>
+      <button id="emptyImportBtn" class="empty-state-btn">
+        <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M7 2v10M2 7h10"/></svg>
+        Add Stops
+      </button>
     </div>
   </div>
 </div>
 
-<button class="fab-add-stops" id="fabAddStops" aria-label="Add stops to plan route">&#43; Add Stops</button>
+<!-- Map FAB column (bottom-left): primary "+" opens quick-add pill;
+     trash clears all stops with an undo toast. Hidden when the bottom
+     sheet is in mobile-plan-visible state. -->
+<div class="map-fabs" id="mapFabs">
+  <button class="map-fab map-fab--primary" id="addStopFab" aria-label="Add a stop" title="Add a stop">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10"/></svg>
+  </button>
+  <button class="map-fab map-fab--danger" id="clearStopsFab" aria-label="Clear all stops" title="Clear all stops">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4.5h10M5.5 4.5V3a1 1 0 011-1h3a1 1 0 011 1v1.5M4 4.5l.7 8.5a1 1 0 001 .9h4.6a1 1 0 001-.9L12 4.5M6.8 7.5v4M9.2 7.5v4"/></svg>
+  </button>
+</div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <!-- Mobile bottom nav bar -->
 <nav class="mobile-nav" id="mobileNav">
   <button class="mobile-nav-tab active" id="mobileNavMap" aria-label="Map view">
-    <span class="mobile-nav-icon">&#9873;</span>
+    <span class="mobile-nav-icon">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 17s6-6 6-10a6 6 0 10-12 0c0 4 6 10 6 10z"/><circle cx="10" cy="7" r="2"/></svg>
+    </span>
     <span class="mobile-nav-label">Map</span>
   </button>
   <button class="mobile-nav-tab" id="mobileNavPlan" aria-label="Plan view">
-    <span class="mobile-nav-icon">&#9776;</span>
+    <span class="mobile-nav-icon">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M4 6h12M4 10h12M4 14h12"/></svg>
+    </span>
     <span class="mobile-nav-label">Plan</span>
   </button>
 </nav>
@@ -187,7 +248,9 @@
 <div class="modal-overlay" id="startModal" role="dialog" aria-modal="true" aria-labelledby="startModalTitle">
   <div class="modal point-modal">
     <div class="point-modal-header">
-      <div class="point-modal-icon point-modal-icon--start">&#9654;</div>
+      <div class="point-modal-icon point-modal-icon--start">
+        <svg viewBox="0 0 18 18" fill="currentColor" aria-hidden="true"><path d="M5 3.5v11l9-5.5z"/></svg>
+      </div>
       <div>
         <h3 id="startModalTitle">Start Point</h3>
         <p class="point-modal-desc">Where does your route begin?</p>
@@ -198,23 +261,45 @@
       <span class="point-modal-current-value" id="startCurrentValue"></span>
     </div>
     <div class="point-mode-tabs" id="startModeTabs">
+      <button class="point-mode-tab" data-mode="none">
+        <span class="point-mode-tab-icon">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+        </span>
+        <span class="point-mode-tab-text">None</span>
+      </button>
       <button class="point-mode-tab active" data-mode="gps">
-        <span class="point-mode-tab-icon">&#9678;</span>
+        <span class="point-mode-tab-icon">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="2.2" fill="currentColor"/><circle cx="8" cy="8" r="5.4"/><path d="M8 .8v2.2M8 13v2.2M.8 8h2.2M13 8h2.2"/></svg>
+        </span>
         <span class="point-mode-tab-text">GPS Location</span>
       </button>
       <button class="point-mode-tab" data-mode="stop">
-        <span class="point-mode-tab-icon">&#9873;</span>
+        <span class="point-mode-tab-icon">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 14s5-5 5-9a5 5 0 10-10 0c0 4 5 9 5 9z"/><circle cx="8" cy="5.5" r="1.7"/></svg>
+        </span>
         <span class="point-mode-tab-text">From Stops</span>
       </button>
       <button class="point-mode-tab" data-mode="address">
-        <span class="point-mode-tab-icon">&#9998;</span>
+        <span class="point-mode-tab-icon">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 2.5l2.5 2.5-7.5 7.5H3.5V10z"/></svg>
+        </span>
         <span class="point-mode-tab-text">Address</span>
       </button>
     </div>
     <div class="point-mode-content" id="startModeContent">
+      <div class="point-mode-section" data-mode="none">
+        <div class="point-mode-hint">
+          <span class="point-mode-hint-icon">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8a5 5 0 015-5 5 5 0 014.4 2.6"/><path d="M12.5 2.5v3h-3"/></svg>
+          </span>
+          Route begins at the first optimized stop. No origin leg will be calculated.
+        </div>
+      </div>
       <div class="point-mode-section active" data-mode="gps">
         <div class="point-mode-hint">
-          <span class="point-mode-hint-icon">&#128205;</span>
+          <span class="point-mode-hint-icon">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 14s5-5 5-9a5 5 0 10-10 0c0 4 5 9 5 9z"/><circle cx="8" cy="5.5" r="1.7"/></svg>
+          </span>
           Route starts from your current GPS location. Make sure location services are enabled.
         </div>
       </div>
@@ -235,7 +320,9 @@
     <div class="point-modal-footer">
       <button class="modal-btn modal-btn-cancel" id="startCancelBtn">Cancel</button>
       <button class="modal-btn modal-btn-primary" id="startConfirmBtn">
-        <span class="point-modal-btn-icon">&#9654;</span> Set Start
+        <span class="point-modal-btn-icon">
+          <svg viewBox="0 0 13 13" fill="currentColor" aria-hidden="true"><path d="M3.5 2.5v8L11 6.5z"/></svg>
+        </span> Set Start
       </button>
     </div>
   </div>
@@ -245,7 +332,9 @@
 <div class="modal-overlay" id="homeModal" role="dialog" aria-modal="true" aria-labelledby="homeModalTitle">
   <div class="modal point-modal">
     <div class="point-modal-header">
-      <div class="point-modal-icon point-modal-icon--end">&#9632;</div>
+      <div class="point-modal-icon point-modal-icon--end">
+        <svg viewBox="0 0 18 18" fill="currentColor" aria-hidden="true"><rect x="4" y="4" width="10" height="10" rx="1.5"/></svg>
+      </div>
       <div>
         <h3 id="homeModalTitle">End Point</h3>
         <p class="point-modal-desc">Where should your route finish?</p>
@@ -257,32 +346,44 @@
     </div>
     <div class="point-mode-tabs" id="homeModeTabs">
       <button class="point-mode-tab active" data-mode="none">
-        <span class="point-mode-tab-icon">&#10005;</span>
+        <span class="point-mode-tab-icon">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+        </span>
         <span class="point-mode-tab-text">None</span>
       </button>
       <button class="point-mode-tab" data-mode="gps">
-        <span class="point-mode-tab-icon">&#9678;</span>
+        <span class="point-mode-tab-icon">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="2.2" fill="currentColor"/><circle cx="8" cy="8" r="5.4"/><path d="M8 .8v2.2M8 13v2.2M.8 8h2.2M13 8h2.2"/></svg>
+        </span>
         <span class="point-mode-tab-text">GPS Location</span>
       </button>
       <button class="point-mode-tab" data-mode="stop">
-        <span class="point-mode-tab-icon">&#9873;</span>
+        <span class="point-mode-tab-icon">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 14s5-5 5-9a5 5 0 10-10 0c0 4 5 9 5 9z"/><circle cx="8" cy="5.5" r="1.7"/></svg>
+        </span>
         <span class="point-mode-tab-text">From Stops</span>
       </button>
       <button class="point-mode-tab" data-mode="address">
-        <span class="point-mode-tab-icon">&#9998;</span>
+        <span class="point-mode-tab-icon">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 2.5l2.5 2.5-7.5 7.5H3.5V10z"/></svg>
+        </span>
         <span class="point-mode-tab-text">Address</span>
       </button>
     </div>
     <div class="point-mode-content" id="homeModeContent">
       <div class="point-mode-section active" data-mode="none">
         <div class="point-mode-hint">
-          <span class="point-mode-hint-icon">&#8634;</span>
+          <span class="point-mode-hint-icon">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8a5 5 0 015-5 5 5 0 014.4 2.6"/><path d="M12.5 2.5v3h-3"/></svg>
+          </span>
           Route ends at the last optimized stop. No return trip will be calculated.
         </div>
       </div>
       <div class="point-mode-section" data-mode="gps">
         <div class="point-mode-hint">
-          <span class="point-mode-hint-icon">&#128205;</span>
+          <span class="point-mode-hint-icon">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 14s5-5 5-9a5 5 0 10-10 0c0 4 5 9 5 9z"/><circle cx="8" cy="5.5" r="1.7"/></svg>
+          </span>
           Route ends at your current GPS location. A return leg will be added.
         </div>
       </div>
@@ -303,7 +404,9 @@
     <div class="point-modal-footer">
       <button class="modal-btn modal-btn-cancel" id="homeCancelBtn">Cancel</button>
       <button class="modal-btn modal-btn-primary" id="homeConfirmBtn">
-        <span class="point-modal-btn-icon">&#9632;</span> Set End
+        <span class="point-modal-btn-icon">
+          <svg viewBox="0 0 13 13" fill="currentColor" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.2"/></svg>
+        </span> Set End
       </button>
     </div>
   </div>
@@ -327,34 +430,38 @@
   </div>
 </div>
 
-<!-- Address Manager modal -->
+<!-- Import Stops modal -->
 <div class="modal-overlay" id="addrModal" role="dialog" aria-modal="true" aria-labelledby="addrModalTitle">
   <div class="addr-modal">
     <div class="addr-header">
       <div class="addr-header-top">
-        <h3 id="addrModalTitle">Manage Stops</h3>
-        <button class="addr-close-btn" id="addrCloseBtnX" aria-label="Close">&times;</button>
+        <h3 id="addrModalTitle">Import Stops</h3>
+        <button class="addr-close-btn" id="addrCloseBtnX" aria-label="Close">
+          <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M3 3l8 8M11 3l-8 8"/></svg>
+        </button>
       </div>
-      <p>Import from a file, paste a list, or add one by one.</p>
+      <p>Bring in many addresses at once from a spreadsheet or a pasted list.</p>
     </div>
     <div class="addr-tabs">
       <button class="addr-tab active" data-tab="import">
-        <span class="addr-tab-icon">&#128194;</span>
-        <span class="addr-tab-label">Import</span>
+        <span class="addr-tab-icon">
+          <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 5.5V3.5a1 1 0 011-1h3l1.2 1.2H11a1 1 0 011 1v1.8M2 5.5h10v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5z"/></svg>
+        </span>
+        <span class="addr-tab-label">From file</span>
       </button>
       <button class="addr-tab" data-tab="paste">
-        <span class="addr-tab-icon">&#128203;</span>
-        <span class="addr-tab-label">Paste</span>
-      </button>
-      <button class="addr-tab" data-tab="manual">
-        <span class="addr-tab-icon">&#43;</span>
-        <span class="addr-tab-label">Add</span>
+        <span class="addr-tab-icon">
+          <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="2.5" width="8" height="9" rx="1.2"/><path d="M5.5 2.5V1.7h3v.8M5 6h4M5 8h3"/></svg>
+        </span>
+        <span class="addr-tab-label">Paste list</span>
       </button>
     </div>
     <div class="addr-body">
       <div class="addr-section active" id="addrImportSection">
         <div class="addr-drop-zone" id="addrDropZone">
-          <div class="addr-drop-zone-icon">&#128194;</div>
+          <div class="addr-drop-zone-icon">
+            <svg viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 3v10M6 8l5-5 5 5M3.5 14.5v3a1 1 0 001 1h13a1 1 0 001-1v-3"/></svg>
+          </div>
           <div class="addr-drop-zone-text">Drop file here or tap to browse</div>
           <div class="addr-drop-zone-hint">CSV, Excel, TSV supported</div>
         </div>
@@ -365,37 +472,8 @@
         </div>
       </div>
       <div class="addr-section" id="addrPasteSection">
-        <textarea class="addr-paste-area" id="addrPasteArea" placeholder="Paste addresses, one per line&#10;&#10;Examples:&#10;  123 Main St, Boston, MA 02101&#10;  456 Oak Ave, Cambridge, MA"></textarea>
-        <div class="addr-help-card">
-          <div class="addr-help-text">One address per line. Include the state. Commas, tabs, or pipes all work.</div>
-        </div>
+        <textarea class="addr-paste-area addr-paste-area-lg" id="addrPasteArea" placeholder="One address per line — include the state. Commas, tabs, or pipes all work.&#10;&#10;Examples:&#10;  123 Main St, Boston, MA 02101&#10;  456 Oak Ave | Cambridge | MA&#10;  789 Elm St&#9;Somerville&#9;MA&#9;02143"></textarea>
         <button class="addr-action-btn" id="addrParseBtn">Parse Addresses</button>
-      </div>
-      <div class="addr-section" id="addrManualSection">
-        <div class="addr-autocomplete">
-          <input type="text" class="addr-search-input" id="addrManualSearch" placeholder="Search for an address..." autocomplete="off">
-          <div class="addr-ac-list" id="addrAcList"></div>
-        </div>
-        <div class="addr-field-group">
-          <div class="addr-field addr-field-street">
-            <input type="text" id="addrManualStreet" placeholder="Street address">
-          </div>
-          <div class="addr-field addr-field-city">
-            <input type="text" id="addrManualCity" placeholder="City">
-          </div>
-          <div class="addr-field-row">
-            <div class="addr-field addr-field-state">
-              <input type="text" id="addrManualState" placeholder="State *">
-            </div>
-            <div class="addr-field addr-field-zip">
-              <input type="text" id="addrManualZip" placeholder="ZIP">
-            </div>
-          </div>
-        </div>
-        <button class="addr-action-btn" id="addrManualAddBtn">Add Stop</button>
-        <div class="addr-help-card">
-          <div class="addr-help-text">Search for an address or type it in below.</div>
-        </div>
       </div>
       <div class="addr-preview" id="addrPreview" style="display:none"></div>
     </div>
@@ -406,19 +484,20 @@
     </div>
     <div class="addr-mode-toggle" id="addrModeToggle" style="display:none">
       <button class="addr-mode-btn active" data-mode="append" id="addrModeAppend">
-        <span class="addr-mode-icon">&#43;</span> Add to existing stops
+        <span class="addr-mode-icon">
+          <svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6.5 2v9M2 6.5h9"/></svg>
+        </span> Add to existing stops
       </button>
       <button class="addr-mode-btn" data-mode="replace" id="addrModeReplace">
-        <span class="addr-mode-icon">&#8634;</span> Replace all stops
+        <span class="addr-mode-icon">
+          <svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 6.5a4 4 0 016.6-3"/><path d="M9.4 2.5v3h-3"/><path d="M10.5 6.5a4 4 0 01-6.6 3"/><path d="M3.6 10.5v-3h3"/></svg>
+        </span> Replace all stops
       </button>
     </div>
     <div class="addr-footer">
-      <span class="addr-footer-count" id="addrFooterCount">0 addresses staged</span>
+      <span class="addr-footer-count" id="addrFooterCount">No addresses yet</span>
       <div class="addr-footer-actions">
-        <button class="addr-footer-btn addr-footer-btn-danger" id="addrResetDefaultBtn">Clear All</button>
-        <button class="addr-footer-btn addr-footer-btn-danger" id="addrClearDataBtn" title="Wipe all app data including tour and cache">🗑️ Data</button>
-        <button class="addr-footer-btn addr-footer-btn-cancel" id="addrCancelBtn">Cancel</button>
-        <button class="addr-footer-btn addr-footer-btn-primary" id="addrConfirmBtn" disabled>Apply Stops</button>
+        <button class="addr-footer-btn addr-footer-btn-primary" id="addrConfirmBtn" disabled>Add stops</button>
       </div>
     </div>
   </div>
