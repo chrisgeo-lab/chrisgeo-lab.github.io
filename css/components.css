@@ -1,77 +1,225 @@
 /* Travel mode toggle */
 .travel-mode-bar{
-  display:none;padding:8px 16px;border-bottom:1px solid var(--separator);
-  gap:4px;background:var(--card-solid)
+  display:none;padding:10px 16px;border-bottom:1px solid var(--separator);
+  gap:6px;background:transparent
 }
 .travel-mode-bar.show{display:flex}
 .travel-mode-btn{
-  flex:1;display:flex;align-items:center;justify-content:center;gap:6px;
-  padding:8px 12px;border-radius:10px;border:none;cursor:pointer;
+  flex:1;display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  padding:9px 12px;border-radius:var(--radius-pill);border:none;cursor:pointer;
   background:var(--fill);color:var(--secondary);font-size:12px;font-weight:600;
-  font-family:var(--font);transition:all .2s
+  font-family:var(--font);letter-spacing:-.005em;
+  transition:all .18s var(--ease-out)
 }
-.travel-mode-btn:active{transform:scale(.95)}
+.travel-mode-btn svg{width:14px;height:14px}
+.travel-mode-btn:active{transform:scale(.96)}
 .travel-mode-btn.active{
   background:var(--blue);color:#fff;
-  box-shadow:0 2px 8px rgba(0,122,255,.25)
+  box-shadow:0 2px 10px rgba(10,132,255,.28),var(--shadow-glow)
 }
-.travel-mode-btn:hover:not(.active){background:var(--separator);color:var(--text)}
-.travel-mode-icon{font-size:14px;line-height:1}
+.travel-mode-btn:hover:not(.active){background:var(--fill-strong);color:var(--text)}
+.travel-mode-icon{display:inline-flex;line-height:1}
 .travel-mode-label{font-size:11px;font-weight:600}
 
 /* Route summary card */
 .route-summary{
-  padding:14px 20px;display:flex;gap:12px;align-items:center;
-  border-bottom:1px solid var(--separator);background:var(--card-solid)
+  padding:14px 18px;display:flex;gap:12px;align-items:center;
+  border-bottom:1px solid var(--separator);
+  background:transparent
 }
 .route-summary-stats{display:flex;gap:4px;flex:1}
-.route-stat{
-  text-align:center;flex:1;padding:8px 4px;border-radius:var(--radius-xs);
-  transition:background .15s
+.route-stat{text-align:center;flex:1;padding:8px 4px}
+.route-stat-val{
+  font-size:20px;font-weight:700;color:var(--text);letter-spacing:-.6px;
+  font-feature-settings:'tnum' 1;transition:color .2s
 }
-.route-stat:hover{background:var(--fill)}
-.route-stat+.route-stat{border-left:1px solid var(--separator)}
-.route-stat-val{font-size:17px;font-weight:700;color:var(--text);letter-spacing:-.3px}
-.route-stat-label{font-size:9px;font-weight:600;color:var(--secondary);text-transform:uppercase;letter-spacing:.5px;margin-top:3px}
+.route-stat-label{
+  font-size:10px;font-weight:600;color:var(--secondary);
+  text-transform:uppercase;letter-spacing:.6px;margin-top:4px
+}
 
-/* Route settings card */
+/* Calculating state — single demure indeterminate hairline on the route summary. */
+.bottom-sheet.calculating .route-summary{position:relative}
+.bottom-sheet.calculating .route-summary::after{
+  content:'';position:absolute;left:0;right:0;bottom:-1px;height:1px;
+  background:linear-gradient(90deg,transparent 0%,var(--blue) 50%,transparent 100%);
+  background-size:40% 100%;background-repeat:no-repeat;background-position:-40% 0;
+  animation:calc-bar 1.4s var(--ease-in-out) infinite;
+  pointer-events:none;opacity:.7
+}
+.stat-shimmer{
+  display:inline-block;color:var(--tertiary);letter-spacing:1.5px;
+  animation:calc-pulse 1.4s var(--ease-in-out) infinite
+}
+@keyframes calc-bar{
+  0%{background-position:-40% 0}
+  100%{background-position:140% 0}
+}
+@keyframes calc-pulse{
+  0%,100%{opacity:.4}
+  50%{opacity:.85}
+}
+@media(prefers-reduced-motion:reduce){
+  .bottom-sheet.calculating .route-summary::after,
+  .stat-shimmer{animation:none}
+  .stat-shimmer{opacity:.6}
+}
+
+/* Liquid-glass recalculation shimmer.
+   Activated when a routing recalculation runs longer than ~1s. A diagonal
+   gloss sweep crosses the route summary, settings card, filter row, and
+   stop list to reassure the user that work is happening. */
+.bottom-sheet.is-recalculating .route-summary,
+.bottom-sheet.is-recalculating .route-settings-card,
+.bottom-sheet.is-recalculating .filter-row{
+  position:relative;
+  overflow:hidden;
+  isolation:isolate
+}
+/* Match each panel's natural rounding so the sweep clips to rounded corners.
+   .route-summary and .filter-row are flush rectangles; .route-settings-card
+   carries var(--radius-md). Scoped explicitly because `border-radius:inherit`
+   fails when the parent's radius is implicit (e.g., from a child wrapper). */
+.bottom-sheet.is-recalculating .route-settings-card{border-radius:var(--radius-md)}
+
+.bottom-sheet.is-recalculating .route-summary::before,
+.bottom-sheet.is-recalculating .route-settings-card::before,
+.bottom-sheet.is-recalculating .filter-row::before{
+  content:'';
+  position:absolute;inset:0;
+  pointer-events:none;
+  /* Wider, softer band — no hard mid-stop — so the sweep reads as a glow
+     rather than a defined rectangle, and the alpha is dialed down to a
+     barely-there hint instead of a flash. */
+  background:linear-gradient(
+    115deg,
+    transparent 20%,
+    rgba(255,255,255,.18) 50%,
+    transparent 80%
+  );
+  background-size:260% 100%;
+  background-repeat:no-repeat;
+  background-position:-160% 0;
+  animation:liquid-glass-sweep 2.2s var(--ease-in-out) infinite;
+  mix-blend-mode:overlay;
+  opacity:.7;
+  border-radius:inherit;
+  z-index:2
+}
+@media(prefers-color-scheme:dark){
+  .bottom-sheet.is-recalculating .route-summary::before,
+  .bottom-sheet.is-recalculating .route-settings-card::before,
+  .bottom-sheet.is-recalculating .filter-row::before{
+    background:linear-gradient(
+      115deg,
+      transparent 20%,
+      rgba(140,190,255,.10) 50%,
+      transparent 80%
+    );
+    background-size:260% 100%;
+    background-repeat:no-repeat;
+    background-position:-160% 0;
+    mix-blend-mode:screen;
+    opacity:.65
+  }
+}
+[data-theme="dark"] .bottom-sheet.is-recalculating .route-summary::before,
+[data-theme="dark"] .bottom-sheet.is-recalculating .route-settings-card::before,
+[data-theme="dark"] .bottom-sheet.is-recalculating .filter-row::before{
+  background:linear-gradient(
+    115deg,
+    transparent 20%,
+    rgba(140,190,255,.10) 50%,
+    transparent 80%
+  );
+  background-size:260% 100%;
+  background-repeat:no-repeat;
+  background-position:-160% 0;
+  mix-blend-mode:screen;
+  opacity:.65
+}
+/* Stagger so panels feel like one continuous wave rather than pulsing in lockstep. */
+.bottom-sheet.is-recalculating .route-settings-card::before{animation-delay:.15s}
+.bottom-sheet.is-recalculating .filter-row::before{animation-delay:.3s}
+
+/* Soft pulse on individual stop items — much cheaper than a sweep on a
+   long scroll container, and reads as "data is being reorganized". */
+.bottom-sheet.is-recalculating .stop-item{
+  animation:liquid-glass-pulse 1.8s var(--ease-in-out) infinite
+}
+.bottom-sheet.is-recalculating .stop-item:nth-child(odd){animation-delay:.2s}
+.bottom-sheet.is-recalculating .stop-item:nth-child(3n){animation-delay:.4s}
+
+@keyframes liquid-glass-sweep{
+  0%{background-position:-160% 0}
+  100%{background-position:260% 0}
+}
+@keyframes liquid-glass-pulse{
+  0%,100%{opacity:1}
+  50%{opacity:.7}
+}
+@media(prefers-reduced-motion:reduce){
+  .bottom-sheet.is-recalculating .route-summary::before,
+  .bottom-sheet.is-recalculating .route-settings-card::before,
+  .bottom-sheet.is-recalculating .filter-row::before,
+  .bottom-sheet.is-recalculating .stop-item{
+    animation:none
+  }
+  .bottom-sheet.is-recalculating .route-summary::before,
+  .bottom-sheet.is-recalculating .route-settings-card::before,
+  .bottom-sheet.is-recalculating .filter-row::before{
+    background:linear-gradient(115deg,transparent,rgba(255,255,255,.25),transparent);
+    opacity:.5
+  }
+}
+
+/* Route settings card — inset glass tile */
 .route-settings-card{
-  margin:12px 16px;padding:14px;border-radius:12px;
-  background:var(--card-solid);
-  border:1px solid var(--separator);
+  margin:12px 16px;padding:14px;border-radius:var(--radius-md);
+  background:var(--fill);
+  border:1px solid var(--separator)
 }
-.route-settings-section{
-  padding:6px 0;
-}
+.route-settings-section{padding:6px 0}
 .route-settings-section:not(:last-child){
   border-bottom:1px solid var(--separator);
-  margin-bottom:10px;
-  padding-bottom:12px;
+  margin-bottom:10px;padding-bottom:12px
 }
 .route-settings-label{
   font-size:11px;font-weight:600;color:var(--secondary);
-  text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;
+  text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px
 }
-.route-settings-actions{display:flex;gap:8px;}
+.route-settings-actions{display:flex;gap:8px}
 .route-settings-btn{
-  flex:1;padding:10px 12px;border-radius:8px;font-size:13px;font-weight:500;
-  border:1px solid var(--separator);background:var(--bg);color:var(--text);
-  cursor:pointer;transition:all .15s;font-family:var(--font);
-  display:flex;align-items:center;justify-content:center;gap:6px;
+  flex:1;padding:10px 12px;border-radius:var(--radius-sm);
+  font-size:13px;font-weight:600;
+  border:1px solid var(--separator);
+  background:var(--card-solid);color:var(--text);
+  cursor:pointer;transition:all .15s var(--ease-out);
+  font-family:var(--font);
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  letter-spacing:-.005em
 }
-.route-settings-btn:hover{background:var(--card);border-color:var(--blue)}
-.route-settings-btn:active{transform:scale(.96)}
+.route-settings-btn svg{width:14px;height:14px}
+.route-settings-btn:hover{background:var(--fill);border-color:var(--blue);color:var(--blue)}
+.route-settings-btn:active{transform:scale(.97)}
+
 .export-btn{
-  flex:1;padding:12px 14px;border-radius:8px;font-size:13px;font-weight:600;
-  border:none;cursor:pointer;transition:all .15s;font-family:var(--font);
-  display:flex;align-items:center;justify-content:center;gap:6px;
-  color:#fff;
+  flex:1;padding:12px 14px;border-radius:var(--radius-sm);
+  font-size:13px;font-weight:600;
+  border:none;cursor:pointer;
+  transition:all .15s var(--ease-out);font-family:var(--font);
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  color:#fff;letter-spacing:-.005em
 }
-.export-btn:active{transform:scale(.96)}
-.export-btn-google{background:linear-gradient(135deg,#4285F4 0%,#34A853 100%);box-shadow:0 2px 8px rgba(66,133,244,.2)}
-.export-btn-google:hover{box-shadow:0 4px 12px rgba(66,133,244,.3)}
-.export-btn-apple{background:linear-gradient(135deg,#000 0%,#333 100%);box-shadow:0 2px 8px rgba(0,0,0,.2)}
-.export-btn-apple:hover{box-shadow:0 4px 12px rgba(0,0,0,.3)}
+.export-btn svg{width:14px;height:14px}
+.export-btn .brand-logo{width:16px;height:16px;flex-shrink:0}
+.export-btn:active{transform:scale(.97)}
+.export-btn-google{background:var(--grad-mint);box-shadow:0 2px 10px rgba(48,209,88,.25),var(--shadow-glow)}
+.export-btn-google:hover{box-shadow:0 4px 16px rgba(48,209,88,.35),var(--shadow-glow)}
+.export-btn-apple{background:linear-gradient(135deg,#1d1d1f 0%,#48484a 100%);box-shadow:var(--shadow-md)}
+.export-btn-apple:hover{box-shadow:var(--shadow-lg)}
+.export-btn-share{background:var(--grad-blue);box-shadow:0 2px 10px rgba(10,132,255,.28),var(--shadow-glow)}
+.export-btn-share:hover{box-shadow:0 4px 16px rgba(10,132,255,.38),var(--shadow-glow)}
 
 /* Route filter dropdown */
 .filter-row{
@@ -79,115 +227,190 @@
   border-bottom:1px solid var(--separator);display:none;position:relative
 }
 .route-dropdown-trigger{
-  width:100%;padding:10px 14px;padding-right:40px;
-  border-radius:var(--radius-xs);border:1px solid var(--separator);
-  background:var(--card-solid);color:var(--text);
-  font-size:14px;font-weight:500;font-family:var(--font);
-  cursor:pointer;transition:border-color .15s,box-shadow .15s;
-  display:flex;align-items:center;gap:10px;position:relative
+  width:100%;padding:11px 14px;padding-right:40px;
+  border-radius:var(--radius-sm);
+  border:1px solid var(--separator);
+  background:var(--fill);color:var(--text);
+  font-size:14px;font-weight:600;font-family:var(--font);
+  cursor:pointer;
+  transition:border-color .15s var(--ease-out),box-shadow .15s var(--ease-out),background .15s var(--ease-out);
+  display:flex;align-items:center;gap:10px;position:relative;
+  letter-spacing:-.005em
 }
-.route-dropdown-trigger:hover{border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,122,255,.08)}
-.route-dropdown-trigger.open{border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,122,255,.12);border-radius:var(--radius-xs) var(--radius-xs) 0 0}
+.route-dropdown-trigger:hover{border-color:var(--blue);background:var(--card-solid);box-shadow:0 0 0 3px rgba(10,132,255,.08)}
+.route-dropdown-trigger.open{border-color:var(--blue);background:var(--card-solid);box-shadow:0 0 0 3px rgba(10,132,255,.14);border-radius:var(--radius-sm) var(--radius-sm) 0 0}
 .route-dropdown-trigger::after{
   content:'';position:absolute;right:14px;top:50%;
   width:8px;height:8px;border-right:2px solid var(--secondary);border-bottom:2px solid var(--secondary);
-  transform:translateY(-60%) rotate(45deg);transition:transform .2s
+  transform:translateY(-60%) rotate(45deg);transition:transform .2s var(--ease-out)
 }
-.route-dropdown-trigger.open::after{transform:translateY(-30%) rotate(-135deg)}
-.route-dropdown-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.route-dropdown-trigger.open::after{transform:translateY(-30%) rotate(-135deg);border-color:var(--blue)}
+/* Flat liquid-glass dot used in dropdown rows + section headers + share modal.
+   Inline `background:` carries the route color; a hairline white ring + tight
+   shadow keep it crisp on translucent panel surfaces. */
+.route-dropdown-dot{
+  width:10px;height:10px;border-radius:50%;flex-shrink:0;
+  border:1px solid rgba(255,255,255,.9);
+  box-shadow:
+    0 1px 2px rgba(0,0,0,.16),
+    0 0 0 .5px rgba(0,0,0,.06)
+}
+/* "All Routes" / "Visited" use shared modifiers so the dropdown, share modal,
+   and section headers display the same swatch for the same concept. */
+.route-dropdown-dot--all,.section-hdr-dot--all,.share-route-dot--all{
+  background:linear-gradient(135deg,#007AFF,#34C759,#FF9500,#AF52DE) !important
+}
+.route-dropdown-dot--visited,.section-hdr-dot--visited,.share-route-dot--visited{
+  background:var(--tertiary) !important
+}
 .route-dropdown-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.route-dropdown-meta{font-size:11px;color:var(--secondary);font-weight:400;margin-left:auto;white-space:nowrap}
+.route-dropdown-meta{font-size:11px;color:var(--secondary);font-weight:500;margin-left:auto;white-space:nowrap;padding-right:8px;flex-shrink:0;font-feature-settings:'tnum' 1}
 
 .route-dropdown-menu{
   position:absolute;top:100%;left:16px;right:16px;z-index:20;
-  background:var(--card-solid);border:1px solid var(--separator);border-top:none;
-  border-radius:0 0 var(--radius-xs) var(--radius-xs);
+  background:var(--glass-3);
+  backdrop-filter:var(--blur-md);-webkit-backdrop-filter:var(--blur-md);
+  border:1px solid var(--separator);border-top:none;
+  border-radius:0 0 var(--radius-sm) var(--radius-sm);
   box-shadow:var(--shadow-lg);overflow:hidden;
-  display:none;max-height:260px;overflow-y:auto
+  display:none;max-height:280px;overflow-y:auto
 }
-.route-dropdown-menu.open{display:block}
+.route-dropdown-menu.open{display:block;animation:dropdown-in .2s var(--ease-out)}
+@keyframes dropdown-in{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
 .route-dropdown-item{
-  padding:10px 14px;cursor:pointer;display:flex;align-items:center;gap:10px;
-  transition:background .1s;border-bottom:1px solid var(--separator)
+  padding:11px 14px;cursor:pointer;display:flex;align-items:center;gap:10px;
+  transition:background .12s var(--ease-out);border-bottom:1px solid var(--separator);
+  position:relative
 }
 .route-dropdown-item:last-child{border-bottom:none}
 .route-dropdown-item:hover{background:var(--fill)}
-.route-dropdown-item:active{background:rgba(0,122,255,.08)}
-.route-dropdown-item.selected{background:rgba(0,122,255,.06)}
+.route-dropdown-item:active{background:rgba(10,132,255,.10)}
+.route-dropdown-item.selected{background:rgba(10,132,255,.08)}
+.route-dropdown-item.selected::before{
+  content:'';position:absolute;left:0;top:6px;bottom:6px;width:3px;
+  background:var(--blue);border-radius:0 2px 2px 0
+}
 .route-dropdown-item-info{flex:1;min-width:0}
-.route-dropdown-item-name{font-size:13px;font-weight:600;color:var(--text)}
-.route-dropdown-item-detail{font-size:11px;color:var(--secondary);margin-top:2px;display:flex;align-items:center;gap:8px}
+.route-dropdown-item-name{font-size:13px;font-weight:600;color:var(--text);letter-spacing:-.005em}
+.route-dropdown-item-detail{font-size:11px;color:var(--secondary);margin-top:2px;display:flex;align-items:center;gap:8px;font-feature-settings:'tnum' 1}
 .route-dropdown-item-progress{
-  flex:1;height:3px;border-radius:2px;background:var(--fill);max-width:60px;overflow:hidden
+  flex:1;height:3px;border-radius:2px;background:var(--fill-strong);max-width:60px;overflow:hidden
 }
 .route-dropdown-item-progress-fill{height:100%;border-radius:2px;transition:width .3s}
 
 /* Stop list */
 .stop-item{
-  display:flex;align-items:center;gap:12px;padding:12px 20px;
-  border-bottom:1px solid var(--separator);cursor:pointer;transition:background .1s
+  display:flex;align-items:center;gap:12px;padding:12px 18px;
+  border-bottom:1px solid var(--separator);cursor:pointer;
+  transition:background .12s var(--ease-out),transform .25s var(--ease-out);
+  position:relative;overflow:hidden;
+  animation:fadeSlideUp .25s var(--ease-out) both
 }
-.stop-item:hover{background:rgba(0,0,0,.02)}
-.stop-item:active{background:rgba(0,0,0,.04)}
-.stop-item.visited{opacity:.45}
+.stop-item:hover{background:var(--fill)}
+.stop-item:active{background:var(--fill-strong)}
+.stop-item-delete{
+  position:absolute;right:0;top:0;bottom:0;width:80px;
+  background:var(--red);
+  display:flex;align-items:center;justify-content:center;
+  color:#fff;opacity:0;transition:opacity .2s var(--ease-out);pointer-events:none
+}
+.stop-item.swiped .stop-item-delete{opacity:1;pointer-events:auto}
+.stop-item-delete-btn{
+  width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.18);
+  border:none;color:#fff;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:all .15s var(--ease-out)
+}
+.stop-item-delete-btn svg{width:16px;height:16px}
+.stop-item-delete-btn:hover{background:rgba(255,255,255,.28);transform:scale(1.08)}
+.stop-item-delete-btn:active{transform:scale(.92)}
+/* Inline always-visible trash icon: greyed out by default, red on hover. */
+.stop-item-trash{
+  flex:0 0 auto;width:32px;height:32px;border-radius:8px;
+  background:transparent;border:none;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  color:var(--tertiary);
+  transition:color .12s var(--ease-out),background .12s var(--ease-out),transform .12s var(--ease-out);
+  margin-left:4px
+}
+.stop-item-trash svg{width:16px;height:16px;display:block}
+.stop-item-trash:hover{color:var(--red);background:rgba(255,69,58,.1)}
+.stop-item-trash:active{transform:scale(.92)}
+.stop-item-trash:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.stop-item.visited{opacity:.5}
 .stop-item.visited .stop-item-name{text-decoration:line-through;color:var(--secondary)}
 .stop-item.current{
-  background:linear-gradient(90deg,rgba(0,122,255,.06),transparent);
+  background:linear-gradient(90deg,rgba(10,132,255,.08),transparent 80%);
   border-left:3px solid var(--blue)
 }
 .stop-item.current .stop-item-name{color:var(--blue);font-weight:600}
-.stop-item.is-home{background:rgba(255,149,0,.04);border-left:3px solid var(--orange)}
-
-.stop-item-num{
-  width:22px;height:22px;border-radius:50%;display:flex;align-items:center;
-  justify-content:center;font-size:10px;font-weight:700;color:#fff;flex-shrink:0
+.stop-item.is-home{background:linear-gradient(90deg,rgba(255,159,10,.06),transparent 80%);border-left:3px solid var(--orange)}
+.stop-item.focused{
+  background:linear-gradient(90deg,rgba(10,132,255,.18),rgba(10,132,255,.04) 70%);
+  box-shadow:inset 0 0 0 1px rgba(10,132,255,.45),0 0 0 1px rgba(10,132,255,.12);
+  animation:stopFocusPulse .9s var(--ease-out)
 }
+.stop-item.focused .stop-item-name{color:var(--blue)}
+@keyframes stopFocusPulse{
+  0%{box-shadow:inset 0 0 0 1px rgba(10,132,255,.85),0 0 0 6px rgba(10,132,255,.18)}
+  100%{box-shadow:inset 0 0 0 1px rgba(10,132,255,.45),0 0 0 1px rgba(10,132,255,.12)}
+}
+
+/* Panel stop number — flat liquid-glass disc that mirrors the on-map .map-pin
+   at smaller scale so the same stop reads as the same object in both places.
+   Route color comes in via inline background; styling stays clean. */
+.stop-item-num{
+  width:24px;height:24px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:700;color:#fff;flex-shrink:0;
+  letter-spacing:-.02em;
+  border:1.5px solid rgba(255,255,255,.95);
+  box-shadow:
+    0 1px 2px rgba(0,0,0,.18),
+    0 2px 6px rgba(0,0,0,.10);
+  font-feature-settings:'tnum' 1
+}
+.stop-item-num svg{width:12px;height:12px}
 .stop-item-info{flex:1;min-width:0}
-.stop-item-name{font-size:14px;font-weight:500;color:var(--text)}
-.stop-item-detail{font-size:11px;color:var(--secondary);margin-top:2px;display:flex;gap:8px}
+.stop-item-name{font-size:14px;font-weight:600;color:var(--text);letter-spacing:-.005em}
+.stop-item-detail{font-size:11px;color:var(--secondary);margin-top:2px;display:flex;gap:8px;font-feature-settings:'tnum' 1}
 .stop-item-check{
   width:24px;height:24px;border-radius:50%;border:2px solid var(--tertiary);
   display:flex;align-items:center;justify-content:center;flex-shrink:0;
-  cursor:pointer;transition:all .2s cubic-bezier(.2,.8,.2,1);font-size:12px;color:transparent;
+  cursor:pointer;transition:all .2s var(--ease-out);color:transparent;
   position:relative
 }
+.stop-item-check svg{width:12px;height:12px}
 .stop-item-check::before{
   content:'';position:absolute;inset:-8px;border-radius:50%
 }
 .stop-item-check:hover{border-color:var(--green)}
 .stop-item-check:active{transform:scale(.85)}
-.stop-item.visited .stop-item-check{background:var(--green);border-color:var(--green);color:#fff}
+.stop-item.visited .stop-item-check{
+  background:var(--green);border-color:var(--green);color:#fff;
+  box-shadow:0 2px 8px rgba(48,209,88,.3)
+}
 
 /* Stop views */
 .stops-view.active{display:block}
 .stops-view{display:none}
 
-
-/* GPS dot */
-.gps-dot{position:relative;width:22px;height:22px}
-.gps-dot-core{
-  position:absolute;top:5px;left:5px;width:12px;height:12px;border-radius:50%;
-  background:var(--blue);border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,122,255,.4)
-}
-.gps-dot-ring{
-  position:absolute;inset:0;border-radius:50%;
-  background:rgba(0,122,255,.15);animation:gps-pulse 2s ease-in-out infinite
-}
-@keyframes gps-pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.5);opacity:0}}
-
 /* Toast */
 .toast{
-  position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(.9);
-  background:rgba(0,0,0,.82);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);
-  color:#fff;padding:14px 22px;border-radius:14px;
+  position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(.92);
+  background:rgba(28,28,32,.86);
+  backdrop-filter:var(--blur-md);-webkit-backdrop-filter:var(--blur-md);
+  border:1px solid rgba(255,255,255,.08);
+  color:#fff;padding:14px 22px;border-radius:var(--radius-md);
   font-size:14px;font-weight:600;z-index:4000;opacity:0;
-  transition:all .3s cubic-bezier(.2,.8,.2,1);pointer-events:none;
+  transition:all .3s var(--ease-out);pointer-events:none;
   max-width:320px;text-align:center;display:flex;align-items:center;gap:12px;
-  letter-spacing:-.01em
+  letter-spacing:-.01em;
+  box-shadow:var(--shadow-xl)
 }
 .toast.show{opacity:1;transform:translate(-50%,-50%) scale(1);pointer-events:auto}
 .toast-undo{
-  background:var(--blue);color:#fff;border:none;padding:6px 14px;border-radius:8px;
+  background:var(--blue);color:#fff;border:none;padding:6px 14px;border-radius:var(--radius-xs);
   font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0
 }
 .toast-undo:active{opacity:.7}
@@ -197,26 +420,29 @@
   padding:8px 16px;border-bottom:1px solid var(--separator)
 }
 .search-input{
-  width:100%;padding:10px 12px 10px 34px;border-radius:10px;
-  border:none;background:var(--fill);color:var(--text);font-size:14px;
-  font-family:var(--font);outline:none;transition:box-shadow .2s,background .2s
+  width:100%;padding:10px 12px 10px 36px;border-radius:var(--radius-sm);
+  border:1px solid transparent;background:var(--fill);color:var(--text);
+  font-size:14px;font-family:var(--font);outline:none;
+  transition:box-shadow .2s,background .2s,border-color .2s;
+  letter-spacing:-.005em
 }
-.search-input:focus{background:var(--bg);box-shadow:0 0 0 3px rgba(0,122,255,.12),0 2px 8px rgba(0,0,0,.04)}
+.search-input:focus{background:var(--card-solid);border-color:var(--blue);box-shadow:0 0 0 3px rgba(10,132,255,.14)}
 .search-input::placeholder{color:var(--tertiary)}
 .search-wrap{position:relative}
-.search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:14px;color:var(--tertiary);pointer-events:none}
+.search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--tertiary);pointer-events:none;display:inline-flex}
+.search-icon svg{width:14px;height:14px}
 
 /* Error/retry state */
 .error-banner{
-  margin:12px 16px;padding:12px 16px;border-radius:12px;
-  background:rgba(255,59,48,.06);border:1px solid rgba(255,59,48,.12);
+  margin:12px 16px;padding:12px 16px;border-radius:var(--radius-sm);
+  background:rgba(255,69,58,.08);border:1px solid rgba(255,69,58,.16);
   display:flex;align-items:center;gap:10px
 }
 .error-banner-text{flex:1;font-size:13px;color:var(--red)}
 .error-retry-btn{
-  padding:8px 14px;border-radius:8px;background:var(--red);color:#fff;
+  padding:8px 14px;border-radius:var(--radius-xs);background:var(--red);color:#fff;
   border:none;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;
-  font-family:var(--font);transition:all .15s
+  font-family:var(--font);transition:all .15s var(--ease-out)
 }
 .error-retry-btn:active{transform:scale(.96)}
 
@@ -224,71 +450,180 @@
 .empty-state{
   padding:48px 24px;text-align:center;color:var(--secondary)
 }
-.empty-state-icon{font-size:48px;margin-bottom:16px;opacity:.6}
-.empty-state-title{font-size:18px;font-weight:700;color:var(--text);margin-bottom:6px}
-.empty-state-text{font-size:14px;line-height:1.5}
-.empty-state-btn{
-  margin-top:20px;padding:14px 32px;border-radius:980px;
-  background:var(--blue);color:#fff;font-size:15px;font-weight:600;
-  border:none;cursor:pointer;font-family:var(--font);transition:all .15s;
-  display:inline-flex;align-items:center;gap:8px;
-  box-shadow:0 4px 16px rgba(0,122,255,.3)
+.empty-state-icon{
+  width:64px;height:64px;margin:0 auto 18px;border-radius:var(--radius-md);
+  background:var(--grad-blue);display:inline-flex;align-items:center;justify-content:center;
+  color:#fff;box-shadow:0 8px 28px rgba(10,132,255,.28),var(--shadow-glow)
 }
-.empty-state-btn:hover{background:#0066d6;box-shadow:0 6px 20px rgba(0,122,255,.35);transform:translateY(-1px)}
-.empty-state-btn:active{transform:scale(.96);box-shadow:0 2px 8px rgba(0,122,255,.2)}
-
-/* Floating add-stops FAB (visible only when empty) */
-.fab-add-stops{
-  display:none;position:fixed;z-index:999;
-  bottom:calc(50% + 20px);left:50%;transform:translateX(-50%);
-  padding:16px 28px;border-radius:980px;
+.empty-state-icon svg{width:30px;height:30px}
+.empty-state-title{font-size:20px;font-weight:700;color:var(--text);margin-bottom:6px;letter-spacing:-.02em}
+.empty-state-text{font-size:14px;line-height:1.55}
+.empty-state-btn{
+  margin-top:20px;padding:14px 32px;border-radius:var(--radius-pill);
   background:var(--blue);color:#fff;font-size:15px;font-weight:600;
   border:none;cursor:pointer;font-family:var(--font);
-  box-shadow:0 6px 24px rgba(0,122,255,.35);
-  transition:all .2s cubic-bezier(.2,.8,.2,1);
-  white-space:nowrap
+  transition:all .18s var(--ease-out);
+  display:inline-flex;align-items:center;gap:8px;
+  box-shadow:0 6px 18px rgba(10,132,255,.32),var(--shadow-glow);
+  letter-spacing:-.005em
 }
-.fab-add-stops:hover{box-shadow:0 8px 28px rgba(0,122,255,.45);transform:translateX(-50%) translateY(-2px)}
-.fab-add-stops:active{transform:translateX(-50%) scale(.95);box-shadow:0 3px 12px rgba(0,122,255,.25)}
-.fab-add-stops.show{display:block}
+.empty-state-btn svg{width:14px;height:14px}
+.empty-state-btn:hover{background:var(--blue-deep);box-shadow:0 8px 24px rgba(10,132,255,.4),var(--shadow-glow);transform:translateY(-1px)}
+.empty-state-btn:active{transform:scale(.97);box-shadow:0 2px 10px rgba(10,132,255,.25)}
+
+/* Map FAB column (bottom-left) — primary "+" + danger trash.
+   Mirrors .map-controls (right rail) but always visible and offers the
+   two highest-frequency actions: add a stop, clear all stops. */
+.map-fabs{
+  position:fixed;z-index:900;
+  left:24px;bottom:24px;
+  display:flex;flex-direction:column;gap:0;
+  border-radius:var(--radius-md);overflow:hidden;
+  background:var(--glass-3);
+  backdrop-filter:var(--blur-md);-webkit-backdrop-filter:var(--blur-md);
+  border:1px solid var(--hairline);
+  box-shadow:var(--shadow-md),var(--shadow-glow)
+}
+.map-fab{
+  width:52px;height:52px;background:transparent;border:none;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  color:var(--text);transition:all .15s var(--ease-out);position:relative
+}
+.map-fab svg{width:20px;height:20px;display:block}
+.map-fab:hover{background:var(--fill)}
+.map-fab:active{background:var(--fill-strong);transform:scale(.94)}
+.map-fab+.map-fab{border-top:1px solid var(--separator)}
+.map-fab--primary{color:var(--blue)}
+.map-fab--primary:hover{color:var(--blue);background:rgba(10,132,255,.12)}
+.map-fab--primary.active{background:rgba(10,132,255,.18);color:var(--blue)}
+.map-fab--danger{color:var(--red,#ff3b30)}
+.map-fab--danger:hover{background:rgba(255,69,58,.10)}
+
+/* Quick-add address pill — anchored above the FAB column. Same glass
+   chrome as the bottom sheet. Animates in from below. */
+.quick-add-pill{
+  position:fixed;z-index:950;
+  left:24px;bottom:96px;width:380px;max-width:calc(100vw - 48px);
+  background:var(--glass-3);
+  backdrop-filter:var(--blur-md);-webkit-backdrop-filter:var(--blur-md);
+  border:1px solid var(--hairline);
+  border-radius:var(--radius-md);
+  box-shadow:var(--shadow-lg),var(--shadow-glow);
+  opacity:0;transform:translateY(8px) scale(.98);pointer-events:none;
+  transition:opacity .18s var(--ease-out),transform .18s var(--ease-out);
+  font-family:var(--font);overflow:hidden
+}
+.quick-add-pill.open{opacity:1;transform:none;pointer-events:auto}
+.quick-add-row{
+  display:flex;align-items:center;gap:8px;
+  padding:10px 12px
+}
+.quick-add-icon{
+  width:28px;height:28px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  color:var(--secondary)
+}
+.quick-add-icon svg{width:16px;height:16px}
+.quick-add-input{
+  flex:1;min-width:0;
+  background:transparent;border:none;outline:none;
+  font-family:var(--font);font-size:15px;font-weight:500;letter-spacing:-.005em;
+  color:var(--text);padding:6px 0
+}
+.quick-add-input::placeholder{color:var(--secondary)}
+.quick-add-close{
+  width:30px;height:30px;flex-shrink:0;
+  background:transparent;border:none;border-radius:var(--radius-sm);
+  cursor:pointer;color:var(--secondary);
+  display:flex;align-items:center;justify-content:center;
+  transition:background .12s var(--ease-out),color .12s var(--ease-out)
+}
+.quick-add-close:hover{background:var(--fill);color:var(--text)}
+.quick-add-close svg{width:13px;height:13px}
+.quick-add-list{
+  position:relative;display:none;max-height:260px;overflow-y:auto;
+  border-top:1px solid var(--separator)
+}
+.quick-add-list.show{display:block}
+/* Stronger highlight for the keyboard-active suggestion than the generic
+   .addr-ac-item.active state — at glass-pill opacity, --fill is too faint to
+   read as "selected" while arrowing through results. */
+.quick-add-list .addr-ac-item.active{
+  background:rgba(10,132,255,.14);
+  box-shadow:inset 3px 0 0 var(--blue)
+}
+.quick-add-list .addr-ac-item.active .addr-ac-item-main{color:var(--blue)}
+.quick-add-hint{
+  padding:6px 14px 9px;
+  font-size:11px;color:var(--secondary);letter-spacing:.1px;
+  border-top:1px solid var(--separator)
+}
+
+/* Map preview pin — ephemeral teardrop dropped while typing.
+   Pulses to communicate "not committed yet". */
+.preview-pin{
+  width:24px;height:32px;position:relative;pointer-events:none
+}
+.preview-pin-core{
+  position:absolute;left:50%;bottom:0;
+  width:14px;height:14px;border-radius:50% 50% 50% 0;
+  background:var(--blue);border:2px solid #fff;
+  transform:translate(-50%,0) rotate(-45deg);
+  transform-origin:50% 100%;
+  box-shadow:0 4px 10px rgba(10,132,255,.4)
+}
+.preview-pin-pulse{
+  position:absolute;left:50%;bottom:-2px;width:18px;height:18px;
+  border-radius:50%;background:rgba(10,132,255,.32);
+  transform:translate(-50%,0);
+  animation:preview-pin-pulse 1.4s ease-out infinite
+}
+@keyframes preview-pin-pulse{
+  0%{transform:translate(-50%,0) scale(.6);opacity:.7}
+  100%{transform:translate(-50%,0) scale(1.8);opacity:0}
+}
 
 /* Export buttons */
 .gmaps-btn{
-  width:100%;padding:14px 20px;border-radius:12px;
-  background:linear-gradient(135deg,#4285F4,#34A853);color:#fff;
+  width:100%;padding:14px 20px;border-radius:var(--radius-sm);
+  background:var(--grad-mint);color:#fff;
   font-size:14px;font-weight:600;border:none;cursor:pointer;
-  display:flex;align-items:center;justify-content:center;gap:8px;
-  box-shadow:0 3px 12px rgba(66,133,244,.25);transition:all .15s;
-  font-family:var(--font)
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  box-shadow:0 4px 14px rgba(48,209,88,.3),var(--shadow-glow);
+  transition:all .15s var(--ease-out);
+  font-family:var(--font);letter-spacing:-.005em
 }
-.gmaps-btn:hover{box-shadow:0 4px 16px rgba(66,133,244,.35);transform:translateY(-1px)}
-.gmaps-btn:active{transform:scale(.97);box-shadow:0 2px 8px rgba(66,133,244,.2)}
+.gmaps-btn svg{width:16px;height:16px}
+.gmaps-btn:hover{box-shadow:0 6px 20px rgba(48,209,88,.4),var(--shadow-glow);transform:translateY(-1px)}
+.gmaps-btn:active{transform:scale(.97);box-shadow:0 2px 8px rgba(48,209,88,.2)}
 
 .apple-maps-btn{
-  width:100%;padding:14px 20px;border-radius:12px;
-  background:linear-gradient(135deg,#1d1d1f,#48484a);color:#fff;
+  width:100%;padding:14px 20px;border-radius:var(--radius-sm);
+  background:linear-gradient(135deg,#1d1d1f 0%,#48484a 100%);color:#fff;
   font-size:14px;font-weight:600;border:none;cursor:pointer;
-  display:flex;align-items:center;justify-content:center;gap:8px;
-  box-shadow:0 3px 12px rgba(0,0,0,.15);transition:all .15s;
-  font-family:var(--font)
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  box-shadow:var(--shadow-md);transition:all .15s var(--ease-out);
+  font-family:var(--font);letter-spacing:-.005em
 }
-.apple-maps-btn:hover{box-shadow:0 4px 16px rgba(0,0,0,.25);transform:translateY(-1px)}
-.apple-maps-btn:active{transform:scale(.97);box-shadow:0 2px 8px rgba(0,0,0,.1)}
+.apple-maps-btn svg{width:16px;height:16px}
+.apple-maps-btn:hover{box-shadow:var(--shadow-lg);transform:translateY(-1px)}
+.apple-maps-btn:active{transform:scale(.97)}
 
 /* Inline badge buttons */
 .badge-btn{
   background:var(--blue);color:#fff;border:none;font-size:11px;font-weight:600;
   cursor:pointer;padding:5px 10px;border-radius:var(--radius-xs);
-  font-family:var(--font);transition:all .15s;white-space:nowrap
+  font-family:var(--font);transition:all .15s var(--ease-out);white-space:nowrap;
+  letter-spacing:-.005em
 }
-.badge-btn:hover{background:#0066d6}
+.badge-btn:hover{background:var(--blue-deep)}
 .badge-btn:active{transform:scale(.96)}
 .badge-btn-danger{
   background:none;border:none;color:var(--red);font-size:11px;font-weight:600;
   cursor:pointer;padding:5px 8px;border-radius:var(--radius-xs);
-  font-family:var(--font);transition:all .15s
+  font-family:var(--font);transition:all .15s var(--ease-out)
 }
-.badge-btn-danger:hover{background:rgba(255,59,48,.08)}
+.badge-btn-danger:hover{background:rgba(255,69,58,.10)}
 .badge-btn-danger:active{transform:scale(.96)}
 
 /* Stops info badge */
@@ -299,18 +634,24 @@
 
 /* Section headers in stop list and nav directions */
 .section-hdr{
-  padding:10px 20px;background:var(--fill);display:flex;align-items:center;
-  gap:10px;border-bottom:1px solid var(--separator);cursor:pointer
+  padding:10px 18px;background:var(--fill);
+  display:flex;align-items:center;gap:10px;
+  border-bottom:1px solid var(--separator);cursor:pointer
 }
-.section-hdr-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}
-.section-hdr-title{font-size:13px;font-weight:600;color:var(--text)}
-.section-hdr-meta{font-size:11px;color:var(--secondary);margin-left:auto}
+.section-hdr-dot{
+  width:10px;height:10px;border-radius:50%;flex-shrink:0;
+  border:1px solid rgba(255,255,255,.9);
+  box-shadow:
+    0 1px 2px rgba(0,0,0,.16),
+    0 0 0 .5px rgba(0,0,0,.06)
+}
+.section-hdr-title{font-size:13px;font-weight:600;color:var(--text);letter-spacing:-.005em}
+.section-hdr-meta{font-size:11px;color:var(--secondary);margin-left:auto;font-feature-settings:'tnum' 1}
 .section-hdr-visited{cursor:default}
 .section-hdr-visited .section-hdr-title{color:var(--secondary)}
 
-
 /* Animated route entry */
 @keyframes fadeSlideUp{
-  from{opacity:0;transform:translateY(8px)}
+  from{opacity:0;transform:translateY(6px)}
   to{opacity:1;transform:translateY(0)}
 }

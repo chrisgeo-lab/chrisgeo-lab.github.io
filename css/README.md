@@ -38,15 +38,6 @@ Order matters: base defines variables used everywhere; responsive overrides must
 - **Map-specific styles**: → `map.css`
 - **Modal/overlay changes**: → `modals.css`
 
-## Migrating from styles.css
-
-The original monolithic `styles.css` (1356 lines) is preserved for reference but no longer loaded. All styles were migrated to the new modular structure with zero functional changes — just reorganization.
-
-To fully remove the old file:
-```bash
-rm css/styles.css
-```
-
 ## Performance Notes
 
 - **HTTP/2 multiplexing**: 8 CSS files load in parallel with no perf penalty vs. 1 monolith

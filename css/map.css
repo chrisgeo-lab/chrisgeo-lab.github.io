@@ -2,63 +2,244 @@
 
 #map{position:fixed;inset:0;z-index:1;pointer-events:auto;touch-action:none}
 #map .maplibregl-canvas-container,#map .maplibregl-canvas{pointer-events:auto !important}
-/* Marker wrapper allows pan/zoom to work — clicks still hit the visible circle */
-#map .maplibregl-marker{pointer-events:none !important}
+/* Marker wrapper allows pan/zoom to work — clicks still hit the visible circle.
+   z-index lifts markers above the theme-swap snapshot overlay (z-index:2) so
+   they don't appear to vanish during a theme change. */
+#map .maplibregl-marker{pointer-events:none !important;z-index:3}
 #map .maplibregl-marker>*{pointer-events:auto !important}
+/* 44x44 hit-area wrapper (added in js/map.js addMarker) — the wrapper IS the
+   maplibre marker so the .maplibregl-marker rule above applies to it. Re-enable
+   pointer events here so taps on the transparent padding (not just the visible
+   icon) register. WCAG 2.5.5 touch-target compliance. */
+#map .maplibregl-marker.marker-hit{pointer-events:auto !important}
 .maplibregl-ctrl-bottom-left,.maplibregl-ctrl-bottom-right,
 .maplibregl-ctrl-top-left,.maplibregl-ctrl-top-right{display:none !important}
 
-/* Floating map controls */
+/* Floating map controls — vertical glass column with hairline separators */
 .map-controls{
-  position:fixed;right:16px;z-index:900;display:flex;flex-direction:column;gap:0;
-  border-radius:14px;overflow:hidden;
-  box-shadow:0 4px 24px rgba(0,0,0,.1),0 1px 4px rgba(0,0,0,.06);
+  position:fixed;right:16px;z-index:900;
+  display:flex;flex-direction:column;gap:0;
+  border-radius:var(--radius-md);overflow:hidden;
+  background:var(--glass-3);
+  backdrop-filter:var(--blur-md);-webkit-backdrop-filter:var(--blur-md);
+  border:1px solid var(--hairline);
+  box-shadow:var(--shadow-md),var(--shadow-glow);
   top:50%;transform:translateY(-50%)
 }
 .map-ctrl-btn{
-  width:44px;height:44px;background:var(--card-solid);border:none;cursor:pointer;
-  display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--text);
-  transition:all .15s;position:relative
+  width:44px;height:44px;background:transparent;border:none;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  color:var(--text);transition:all .15s var(--ease-out);position:relative
 }
+.map-ctrl-btn svg{width:18px;height:18px;display:block}
 .map-ctrl-btn:hover{background:var(--fill);color:var(--blue)}
-.map-ctrl-btn:active{background:rgba(0,122,255,.08);transform:scale(.9)}
+.map-ctrl-btn:active{background:var(--fill-strong);transform:scale(.92)}
 .map-ctrl-btn+.map-ctrl-btn{border-top:1px solid var(--separator)}
-#gpsLocBtn{font-size:16px}
-#toggleVisitedBtn{font-size:14px;opacity:.5}
-#manageStopsBtn{font-size:15px}
-#tourBtn{font-size:14px;font-weight:700;color:var(--blue)}
+#toggleVisitedBtn{opacity:.55}
+#toggleVisitedBtn.active{opacity:1;color:var(--blue)}
+#tourBtn{font-size:13px;font-weight:700;color:var(--blue);letter-spacing:-.01em}
 
-/* MapLibre popups */
+/* MapLibre popups — compact liquid glass chip */
+/* z-index lifts the popup above markers (z-index:3 above) so the route
+   picker dropdown menu, which extends below the trigger, isn't covered
+   by stop-number markers sitting beneath the popup. */
+.maplibregl-popup{max-width:260px !important;filter:drop-shadow(0 12px 28px rgba(0,0,0,.22));z-index:10}
 .maplibregl-popup-content{
-  border-radius:14px!important;box-shadow:0 8px 32px rgba(0,0,0,.15)!important;padding:0!important;
-  background:var(--card-solid)!important;color:var(--text)!important
+  border-radius:16px !important;
+  box-shadow:none !important;
+  padding:0 !important;
+  /* Near-opaque so the address text reads cleanly over busy map tiles —
+     a hint of translucency keeps the liquid-glass feel without sacrificing
+     legibility. Dark-mode override below. */
+  background:rgba(255,255,255,.96) !important;
+  backdrop-filter:var(--blur-lg) saturate(160%);-webkit-backdrop-filter:var(--blur-lg) saturate(160%);
+  border:1px solid var(--hairline);
+  color:var(--text) !important;
+  /* overflow:visible — the route picker dropdown menu drops below the
+     trigger and would be clipped by overflow:hidden. The popup's children
+     don't extend past the rounded box on their own, so visible is safe. */
+  overflow:visible
 }
-.maplibregl-popup-tip{border-top-color:var(--card-solid)!important}
-.maplibregl-popup-anchor-bottom .maplibregl-popup-tip{border-top-color:var(--card-solid)!important;border-bottom-color:transparent!important}
-.maplibregl-popup-anchor-top .maplibregl-popup-tip{border-bottom-color:var(--card-solid)!important;border-top-color:transparent!important}
-.maplibregl-popup-anchor-left .maplibregl-popup-tip{border-right-color:var(--card-solid)!important;border-left-color:transparent!important}
-.maplibregl-popup-anchor-right .maplibregl-popup-tip{border-left-color:var(--card-solid)!important;border-right-color:transparent!important}
-.maplibregl-popup-close-button{font-size:18px;padding:4px 8px;color:var(--secondary)}
-.maplibregl-popup-close-button:hover{color:var(--text);background:var(--fill);border-radius:50%}
-.stop-popup{padding:14px 16px;font-family:var(--font)}
-.stop-popup-label{font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase}
-.stop-popup-street{font-size:15px;font-weight:700;margin-top:4px;color:var(--text);letter-spacing:-.01em}
-.stop-popup-addr{font-size:12px;color:var(--secondary);margin-top:2px}
+.maplibregl-popup-tip{display:none !important}
+.maplibregl-popup-close-button{
+  position:absolute;top:4px;right:6px;width:20px;height:20px;
+  font-size:0;line-height:0;padding:0;border-radius:50%;
+  color:var(--secondary);background:transparent;border:none;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:background .15s var(--ease-out),color .15s var(--ease-out)
+}
+.maplibregl-popup-close-button::before{
+  content:'';width:9px;height:9px;display:block;
+  background:currentColor;
+  -webkit-mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round'><path d='M3 3l6 6M9 3l-6 6'/></svg>") center/contain no-repeat;
+          mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round'><path d='M3 3l6 6M9 3l-6 6'/></svg>") center/contain no-repeat
+}
+.maplibregl-popup-close-button:hover{color:var(--text);background:var(--fill)}
+
+/* Dark-mode popup background: dim glass instead of bright white. */
+@media(prefers-color-scheme:dark){
+  .maplibregl-popup-content{background:rgba(28,28,32,.94) !important}
+}
+:root[data-theme="dark"] .maplibregl-popup-content{background:rgba(28,28,32,.94) !important}
+:root[data-theme="light"] .maplibregl-popup-content{background:rgba(255,255,255,.96) !important}
+
+.stop-popup{padding:12px 14px 13px;font-family:var(--font);min-width:188px}
+.stop-popup-label{
+  font-size:9.5px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;
+  opacity:.9
+}
+.stop-popup-street{font-size:14px;font-weight:600;margin-top:3px;color:var(--text);letter-spacing:-.01em;line-height:1.25}
+.stop-popup-addr{font-size:11.5px;color:var(--secondary);margin-top:2px;line-height:1.3}
 .stop-popup-leg{font-size:11px;color:var(--secondary);margin-top:8px;padding-top:8px;border-top:1px solid var(--separator)}
 .stop-popup-btn{
-  margin-top:10px;width:100%;padding:10px;border-radius:10px;border:none;
-  font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;
-  font-family:var(--font)
+  margin-top:10px;width:100%;padding:8px 10px;border-radius:10px;border:1px solid transparent;
+  font-size:12px;font-weight:600;cursor:pointer;letter-spacing:-.01em;
+  transition:transform .12s var(--ease-out),box-shadow .12s var(--ease-out),background .12s var(--ease-out),border-color .12s var(--ease-out);
+  font-family:var(--font);
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  min-height:0;line-height:1
 }
-.stop-popup-btn:active{opacity:.7;transform:scale(.97)}
-.stop-popup-btn-visit{background:#34C759;color:#fff}
-.stop-popup-btn-unvisit{background:var(--fill);color:var(--text)}
+.stop-popup-btn svg{width:12px;height:12px;flex:0 0 auto}
+.stop-popup-btn:active{transform:scale(.97)}
+.stop-popup-btn:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.stop-popup-btn-visit{background:var(--green);color:#fff;box-shadow:0 1px 4px rgba(48,209,88,.3)}
+.stop-popup-btn-visit:hover{box-shadow:0 2px 10px rgba(48,209,88,.45)}
+.stop-popup-btn-unvisit{background:var(--fill);color:var(--text);border-color:var(--hairline)}
+.stop-popup-btn-unvisit:hover{background:var(--fill-strong,var(--fill))}
+.stop-popup-btn-delete{
+  background:rgba(255,69,58,.08);color:var(--red,#ff3b30);
+  border-color:rgba(255,69,58,.18)
+}
+.stop-popup-btn-delete:hover{background:rgba(255,69,58,.16);border-color:rgba(255,69,58,.32)}
 
-/* GPS dot (live geolocation marker) */
-.gps-dot{width:20px;height:20px;position:relative;display:flex;align-items:center;justify-content:center}
-.gps-dot-core{width:12px;height:12px;border-radius:50%;background:var(--blue);position:absolute}
-.gps-dot-ring{
-  width:20px;height:20px;border-radius:50%;background:rgba(0,122,255,.25);position:absolute;
-  animation:gps-pulse 1.4s ease-out infinite
+/* 3-action footer: visit + delete share a row */
+.stop-popup-actions{display:flex;gap:6px;margin-top:10px}
+.stop-popup-actions .stop-popup-btn{margin-top:0;flex:1 1 0;min-width:0}
+
+/* "Move to" route picker — custom dropdown that mirrors the right-panel
+   .route-dropdown-trigger / .route-dropdown-menu so the two pickers feel
+   like the same control at different sizes. We re-use the .route-dropdown-*
+   classes so the open menu, items, dots, and selected indicator are
+   visually identical. */
+.stop-popup-move{
+  display:block;margin-top:10px;position:relative
 }
-@keyframes gps-pulse{0%{transform:scale(.8);opacity:.6}100%{transform:scale(1.8);opacity:0}}
+.stop-popup-move-label{
+  display:block;
+  font-size:9.5px;font-weight:700;letter-spacing:.7px;
+  text-transform:uppercase;color:var(--secondary);
+  margin-bottom:5px
+}
+/* Compact trigger — overrides .route-dropdown-trigger sizing for the popup. */
+.stop-popup-move-trigger.route-dropdown-trigger{
+  padding:9px 30px 9px 12px;font-size:12.5px;
+  border-radius:var(--radius-sm);
+  gap:8px
+}
+.stop-popup-move-trigger.route-dropdown-trigger::after{
+  right:12px;width:7px;height:7px;border-width:1.8px
+}
+.stop-popup-move-trigger .route-dropdown-dot{width:9px;height:9px}
+/* Menu — anchors to the trigger inside the popup body (not the panel
+   filter row), so pin to the popup edges rather than left:16px/right:16px. */
+.stop-popup-move-menu.route-dropdown-menu{
+  left:0;right:0;max-height:200px
+}
+.stop-popup-move-menu .route-dropdown-item{padding:9px 12px;gap:8px}
+.stop-popup-move-menu .route-dropdown-item-name{font-size:12.5px}
+.stop-popup-move-menu .route-dropdown-dot{width:9px;height:9px}
+
+/* GPS dot (live geolocation marker) — uses --blue token so the dot follows
+   theme + accent without hardcoded rgba. */
+.gps-dot{width:22px;height:22px;position:relative;display:flex;align-items:center;justify-content:center}
+.gps-dot-core{
+  width:13px;height:13px;border-radius:50%;
+  background:radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--blue) 80%, #fff) 0%, var(--blue) 70%);
+  position:absolute;
+  border:2px solid #fff;
+  box-shadow:
+    0 2px 8px color-mix(in srgb, var(--blue) 50%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--blue) 30%, transparent)
+}
+.gps-dot-ring{
+  width:22px;height:22px;border-radius:50%;
+  background:color-mix(in srgb, var(--blue) 28%, transparent);
+  position:absolute;
+  animation:gps-pulse 1.6s ease-out infinite
+}
+@keyframes gps-pulse{0%{transform:scale(.8);opacity:.65}100%{transform:scale(2);opacity:0}}
+
+/* ──────────────────────────────────────────────────────────────────────
+   Map pins — flat, sleek liquid-glass discs.
+   Markup (built in js/map.js stopIcon/homeIcon):
+     <div class="map-pin map-pin-stop [is-current|is-visited]" style="--pin-color:#xxx">
+       <span class="map-pin-content"><span class="map-pin-num">1</span></span>
+     </div>
+   Aesthetic notes:
+   - The disc IS the pin — no chunky 3D bead, no top-light sheen, no drop
+     pin tail. Just a flat colored circle with a hairline white ring and a
+     tight soft shadow, in line with the rest of the app's liquid glass.
+   - The route color carries via `--pin-color` and reads at 100% saturation
+     so the on-map color matches the panel-side dot exactly.
+   - SVG/text content sits centered on the disc with a subtle drop shadow
+     so it stays legible over busy map tiles. */
+.map-pin{
+  --pin-size:22px;
+  position:relative;
+  width:var(--pin-size);height:var(--pin-size);
+  border-radius:50%;
+  background:var(--pin-color);
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--font);font-feature-settings:'tnum' 1;
+  color:#fff;
+  border:1.5px solid rgba(255,255,255,.95);
+  box-shadow:
+    0 1px 2px rgba(0,0,0,.22),
+    0 4px 10px rgba(0,0,0,.14),
+    0 0 0 .5px color-mix(in srgb, var(--pin-color) 50%, transparent);
+  transition:transform .15s var(--ease-out), box-shadow .2s var(--ease-out)
+}
+.map-pin:hover{
+  transform:scale(1.1);
+  box-shadow:
+    0 1px 2px rgba(0,0,0,.22),
+    0 6px 16px rgba(0,0,0,.18),
+    0 0 0 .5px color-mix(in srgb, var(--pin-color) 60%, transparent)
+}
+.map-pin-content{
+  display:flex;align-items:center;justify-content:center;
+  width:100%;height:100%;
+  line-height:1
+}
+.map-pin-num{
+  font-size:10.5px;font-weight:700;line-height:1;letter-spacing:-.02em
+}
+.map-pin-content svg{
+  width:60%;height:60%;
+  filter:drop-shadow(0 1px 1px rgba(0,0,0,.22))
+}
+
+/* Current next-stop variant — soft accent ring instead of a chunky aura.
+   Reads as "you are here" without dominating the map. */
+.map-pin.is-current{
+  --pin-size:28px;
+  border-width:2px;
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--pin-color) 22%, transparent),
+    0 2px 6px rgba(0,0,0,.22),
+    0 8px 20px color-mix(in srgb, var(--pin-color) 30%, transparent)
+}
+.map-pin.is-current .map-pin-num{font-size:12px}
+
+/* Visited variant — small, dim, no border emphasis */
+.map-pin.is-visited{
+  --pin-size:18px;
+  opacity:.6;
+  border-color:rgba(255,255,255,.85);
+  box-shadow:0 1px 2px rgba(0,0,0,.18)
+}
+.map-pin.is-visited .map-pin-content svg{width:64%;height:64%}
+
+/* Home/end — same flat disc, slightly larger so it reads as the anchor */
+.map-pin-home{ --pin-size:24px }
+.map-pin-home .map-pin-content svg{ width:58%; height:58% }

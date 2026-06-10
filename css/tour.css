@@ -1,22 +1,79 @@
 /* Guided Tour — backdrop, spotlight, tooltip, caret, progress dots */
 
-/* Full-viewport SVG dim with a punched-out hole around the target */
 .tour-backdrop{
   position:fixed;inset:0;width:100vw;height:100vh;height:100dvh;
   z-index:8999;pointer-events:none;
-  opacity:0;transition:opacity .24s cubic-bezier(.4,0,.2,1)
+  opacity:0;transition:opacity .24s var(--ease-in-out)
 }
 .tour-backdrop.visible{opacity:1}
 
-/* Pulsing ring around the highlighted element */
+/* Click shield blocks all underlying UI input while the tour is active.
+   Sits above page UI but below the spotlight + tooltip so the tour can
+   still receive user clicks and the spotlight stays visible.
+   Programmatic .click() calls bypass this — only real pointer input is blocked. */
+.tour-click-shield{
+  position:fixed;inset:0;z-index:9000;
+  background:transparent;
+  pointer-events:auto;
+  cursor:not-allowed
+}
+/* During a cinematic interaction we raise the shield above the modal/popup
+   that the tour just opened so the user can't click it. Programmatic .click()
+   still works because synthetic events bypass pointer-events. */
+body.tour-cinematic-active .tour-click-shield{
+  z-index:9500
+}
+
+/* When the tour drives a modal/popup/pill open as part of a cinematic, lift it
+   above the click-shield (z:9000) and the spotlight (z:9002) so it isn't
+   visually buried. */
+body.tour-cinematic-active .modal-overlay.show,
+body.tour-cinematic-active .quick-add-pill.open,
+body.tour-cinematic-active .maplibregl-popup{
+  z-index:9001 !important
+}
+
+/* While a cinematic interaction is running, fade the tooltip card, the blue
+   halo, and the dark backdrop out of the way so they don't cover (or visually
+   mute) what the demo is showing. All three come back when the cinematic
+   completes — either the hook ends or the next step's showStep clears the
+   class. */
+body.tour-cinematic-active .tour-tooltip,
+body.tour-cinematic-active .tour-spotlight,
+body.tour-cinematic-active .tour-backdrop{
+  opacity:0 !important;
+  pointer-events:none !important;
+  transition:opacity .28s var(--ease-in-out) !important
+}
+
+/* Lock the tour navigation while a cinematic is running so the user can't
+   tap Next/Back/dots to skip past mid-demo. The close (×) stays clickable
+   so they can still bail out. */
+body.tour-cinematic-running .tour-btn-next,
+body.tour-cinematic-running .tour-btn-back,
+body.tour-cinematic-running .tour-btn-skip,
+body.tour-cinematic-running .tour-dot{
+  opacity:.45;
+  pointer-events:none;
+  cursor:not-allowed
+}
+
+/* Halo spotlight — uses --blue token so dark mode + theming follow.
+   Position transitions are intentionally OFF: each step snaps the spotlight
+   to its target with transitions disabled, then fades opacity in. This avoids
+   the "ghost slide" between distant targets that read as glitchy. */
 .tour-spotlight{
-  position:fixed;z-index:9000;border-radius:14px;pointer-events:none;
-  opacity:0;transition:all .3s cubic-bezier(.4,0,.2,1);
-  box-shadow:0 0 0 3px rgba(0,122,255,.85),0 0 0 9px rgba(0,122,255,.18),0 8px 28px rgba(0,122,255,.25)
+  position:fixed;z-index:9002;border-radius:var(--radius-sm);pointer-events:none;
+  opacity:0;
+  transition:opacity .28s var(--ease-in-out);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--blue) 90%, transparent),
+    0 0 0 12px color-mix(in srgb, var(--blue) 16%, transparent),
+    0 18px 48px color-mix(in srgb, var(--blue) 30%, transparent)
 }
 .tour-spotlight::before{
-  content:'';position:absolute;inset:-4px;border-radius:16px;
-  border:2px solid rgba(0,122,255,.55);
+  content:'';position:absolute;inset:-4px;border-radius:var(--radius-md);
+  border:2px solid color-mix(in srgb, var(--blue) 55%, transparent);
   animation:tour-pulse 1.8s ease-in-out infinite
 }
 @keyframes tour-pulse{
@@ -24,149 +81,156 @@
   50%{transform:scale(1.06);opacity:0}
 }
 
-.tour-tooltip{
-  position:fixed;z-index:9001;
-  width:320px;max-width:calc(100vw - 32px);
-  background:var(--card-solid);color:var(--text);
-  border-radius:var(--radius);
-  padding:22px 22px 18px;
-  box-shadow:0 16px 56px rgba(0,0,0,.28),0 2px 12px rgba(0,0,0,.12);
-  opacity:0;transform:translateY(8px) scale(.96);
-  transition:opacity .22s cubic-bezier(.4,0,.2,1),transform .22s cubic-bezier(.4,0,.2,1);
-  pointer-events:auto;font-family:var(--font);
-  border:1px solid var(--separator)
+/* On-element pulse used by cinematic hooks (FAB, travel mode bar, cluster card, export card) */
+.tour-pulse{
+  animation:tour-element-pulse 1.2s var(--ease-in-out)
 }
-.tour-tooltip.visible{opacity:1;transform:translateY(0) scale(1)}
+@keyframes tour-element-pulse{
+  0%,100%{box-shadow:0 0 0 0 color-mix(in srgb, var(--blue) 0%, transparent)}
+  50%{box-shadow:0 0 0 10px color-mix(in srgb, var(--blue) 22%, transparent)}
+}
+
+.tour-tooltip{
+  position:fixed;z-index:9003;
+  width:340px;max-width:calc(100vw - 32px);
+  background:var(--glass-3, var(--glass-2));
+  backdrop-filter:var(--blur-lg) saturate(160%);
+  -webkit-backdrop-filter:var(--blur-lg) saturate(160%);
+  color:var(--text);
+  border-radius:18px;
+  padding:18px 18px 14px;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.08) inset,
+    0 0 0 1px color-mix(in srgb, var(--blue) 8%, transparent) inset,
+    var(--shadow-xl),
+    0 24px 60px -12px color-mix(in srgb, var(--blue) 22%, transparent);
+  opacity:0;
+  /* No transform animation — we want a clean fade only, no wiggle */
+  transition:opacity .22s var(--ease-in-out);
+  pointer-events:auto;font-family:var(--font);
+  font-feature-settings:'ss01','cv11';
+  border:1px solid var(--hairline)
+}
+.tour-tooltip.visible{opacity:1}
 .tour-tooltip.tour-center{
   top:50% !important;left:50% !important;
-  transform:translate(-50%,-50%) scale(.96) !important;
+  transform:translate(-50%,-50%) !important;
   bottom:auto !important;right:auto !important
 }
 .tour-tooltip.tour-center.visible{
-  transform:translate(-50%,-50%) scale(1) !important
+  transform:translate(-50%,-50%) !important
 }
-
-/* Caret pointing at target; positioned dynamically by JS */
-.tour-caret{
-  position:absolute;width:14px;height:14px;
-  background:var(--card-solid);
-  border-left:1px solid var(--separator);
-  border-top:1px solid var(--separator);
-  pointer-events:none
-}
-.tour-tooltip[data-side="bottom"] .tour-caret{
-  top:-7px;transform:rotate(45deg)
-}
-.tour-tooltip[data-side="top"] .tour-caret{
-  bottom:-7px;transform:rotate(-135deg)
-}
-.tour-tooltip[data-side="left"] .tour-caret{
-  right:-7px;transform:rotate(135deg)
-}
-.tour-tooltip[data-side="right"] .tour-caret{
-  left:-7px;transform:rotate(-45deg)
-}
-.tour-tooltip[data-side="center"] .tour-caret,
-.tour-tooltip.tour-center .tour-caret{display:none}
 
 .tour-close{
   position:absolute;top:10px;right:10px;
-  width:28px;height:28px;border-radius:50%;
-  border:none;cursor:pointer;background:var(--fill);color:var(--secondary);
-  font-size:18px;line-height:1;
+  width:26px;height:26px;border-radius:50%;
+  border:none;cursor:pointer;
+  background:color-mix(in srgb, var(--text) 6%, transparent);
+  color:var(--secondary);
   display:flex;align-items:center;justify-content:center;
-  transition:all .15s;font-family:var(--font)
+  transition:all .15s var(--ease-out);font-family:var(--font)
 }
-.tour-close:hover{background:var(--separator);color:var(--text)}
+.tour-close svg{width:11px;height:11px}
+.tour-close:hover{background:color-mix(in srgb, var(--text) 12%, transparent);color:var(--text)}
 .tour-close:active{transform:scale(.92)}
 
-.tour-progress{
-  height:3px;background:var(--fill);border-radius:2px;
-  margin:6px 0 14px;overflow:hidden
-}
-.tour-progress-fill{
-  height:100%;background:linear-gradient(90deg,var(--blue),var(--indigo));
-  border-radius:2px;
-  transition:width .35s cubic-bezier(.4,0,.2,1)
-}
 .tour-tooltip-title{
-  font-size:17px;font-weight:700;color:var(--text);margin-bottom:6px;
-  letter-spacing:-.3px;padding-right:24px
+  font-family:var(--font);
+  font-size:20px;font-weight:700;color:var(--text);margin-bottom:6px;
+  letter-spacing:-.02em;padding-right:32px;
+  line-height:1.2;
+  margin-top:2px
 }
 .tour-tooltip-body{
-  font-size:14px;color:var(--secondary);line-height:1.55;margin-bottom:18px;
-  letter-spacing:-.005em
+  font-family:var(--font);
+  font-size:14px;color:var(--secondary);line-height:1.5;margin-bottom:16px;
+  letter-spacing:-.01em;
+  font-weight:400
+}
+.tour-tooltip-body strong{
+  display:inline-block;
+  color:var(--text);font-weight:600;
+  background:color-mix(in srgb, var(--blue) 10%, transparent);
+  border:1px solid color-mix(in srgb, var(--blue) 18%, transparent);
+  padding:0 5px;border-radius:5px;
+  font-size:12.5px;
+  margin:0 1px;
+  line-height:1.4
 }
 .tour-tooltip-footer{
   display:flex;align-items:center;justify-content:space-between;gap:12px
 }
-.tour-dots{
-  display:flex;align-items:center;gap:6px;flex-wrap:wrap
-}
+.tour-dots{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
 .tour-dot{
-  width:7px;height:7px;border-radius:50%;background:var(--fill);
-  cursor:pointer;transition:all .2s cubic-bezier(.4,0,.2,1);
+  width:6px;height:6px;border-radius:50%;
+  background:color-mix(in srgb, var(--text) 12%, transparent);
+  cursor:pointer;transition:all .2s var(--ease-in-out);
   border:none;padding:0;display:inline-block
 }
-.tour-dot:hover{background:var(--tertiary);transform:scale(1.15)}
-.tour-dot.done{background:var(--tertiary)}
+.tour-dot:hover{background:color-mix(in srgb, var(--text) 28%, transparent);transform:scale(1.2)}
+.tour-dot.done{background:color-mix(in srgb, var(--blue) 38%, transparent)}
 .tour-dot.active{
-  background:var(--blue);width:20px;border-radius:4px;
-  box-shadow:0 1px 4px rgba(0,122,255,.35)
+  background:var(--blue);width:18px;border-radius:3px;
+  box-shadow:0 1px 4px color-mix(in srgb, var(--blue) 35%, transparent)
 }
 .tour-actions{display:flex;gap:6px;align-items:center}
 .tour-btn{
-  padding:9px 16px;border-radius:10px;font-size:13px;font-weight:600;
+  padding:8px 14px;border-radius:10px;font-size:13px;font-weight:600;
   border:none;cursor:pointer;font-family:var(--font);
-  transition:all .15s cubic-bezier(.4,0,.2,1);
+  transition:all .15s var(--ease-in-out);
   white-space:nowrap;letter-spacing:-.005em
 }
-.tour-btn:active{transform:scale(.95)}
+.tour-btn:active{transform:scale(.96)}
+
 .tour-btn-next{
   background:var(--blue);color:#fff;
-  box-shadow:0 2px 8px rgba(0,122,255,.25)
+  box-shadow:0 1px 0 rgba(255,255,255,.18) inset,
+             0 4px 12px color-mix(in srgb, var(--blue) 28%, transparent)
 }
-.tour-btn-next:hover{background:#0066d6;box-shadow:0 4px 12px rgba(0,122,255,.35)}
-.tour-btn-back{background:var(--fill);color:var(--text)}
-.tour-btn-back:hover{background:rgba(120,120,128,.18)}
-.tour-btn-skip{background:none;color:var(--secondary);padding:9px 10px}
+.tour-btn-next:hover{
+  background:var(--blue-deep);
+  box-shadow:0 1px 0 rgba(255,255,255,.18) inset,
+             0 6px 16px color-mix(in srgb, var(--blue) 38%, transparent)
+}
+.tour-btn-back{
+  background:color-mix(in srgb, var(--text) 6%, transparent);
+  color:var(--text)
+}
+.tour-btn-back:hover{background:color-mix(in srgb, var(--text) 12%, transparent)}
+.tour-btn-skip{background:none;color:var(--secondary);padding:8px 8px}
 .tour-btn-skip:hover{color:var(--text)}
 
-/* The spotlight + punched-mask backdrop handle the visual emphasis;
-   no z-index lift needed (which would not work for fixed-positioned
-   children with their own stacking context anyway). */
 .tour-highlight{
   border-radius:var(--radius-xs);
   transition:filter .25s ease
 }
 
 @media(prefers-reduced-motion:reduce){
+  .tour-spotlight{transition:opacity .05s linear}
   .tour-spotlight::before{animation:none}
-  .tour-tooltip,.tour-tooltip-progress-fill,.tour-backdrop{transition-duration:.05s}
+  .tour-pulse{animation:none}
+  .tour-tooltip,.tour-backdrop{transition-duration:.05s}
 }
 
 @media(max-width:767px){
   .tour-tooltip{
-    width:calc(100vw - 24px);max-width:380px;padding:18px 18px 16px;
+    width:calc(100vw - 24px);max-width:380px;padding:16px 16px 14px;
     position:fixed !important;
     bottom:calc(16px + env(safe-area-inset-bottom)) !important;top:auto !important;
     left:50% !important;right:auto !important;
-    transform:translateX(-50%) translateY(8px) scale(.96) !important
+    transform:translateX(-50%) !important
   }
-  .tour-tooltip.visible{
-    transform:translateX(-50%) translateY(0) scale(1) !important
-  }
+  .tour-tooltip.visible{transform:translateX(-50%) !important}
   .tour-tooltip.tour-center{
     top:auto !important;bottom:calc(16px + env(safe-area-inset-bottom)) !important;
-    transform:translateX(-50%) translateY(0) scale(.96) !important
+    transform:translateX(-50%) !important
   }
   .tour-tooltip.tour-center.visible{
-    transform:translateX(-50%) translateY(0) scale(1) !important
+    transform:translateX(-50%) !important
   }
-  /* On mobile we use a fixed-bottom tooltip; hide the caret since it
-     wouldn't accurately point at the target after the layout shift. */
   .tour-tooltip .tour-caret{display:none}
   .tour-tooltip-title{font-size:16px}
   .tour-tooltip-body{font-size:13px;margin-bottom:14px;line-height:1.5}
-  .tour-btn{padding:10px 14px;font-size:13px}
-  .tour-dot.active{width:18px}
+  .tour-btn{padding:9px 14px;font-size:13px}
+  .tour-dot.active{width:16px}
+}

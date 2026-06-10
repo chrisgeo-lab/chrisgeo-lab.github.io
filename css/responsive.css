@@ -18,25 +18,6 @@
   .panel-toggle.panel-hidden{right:0;border-radius:8px 0 0 8px}
 }
 
-/* Mobile nav bar */
-.mobile-nav{
-  display:none;position:fixed;bottom:0;left:0;right:0;z-index:1100;
-  background:var(--card);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);
-  border-top:1px solid var(--separator);
-  padding:6px 0 calc(6px + env(safe-area-inset-bottom));
-  justify-content:space-around;align-items:center
-}
-.mobile-nav-tab{
-  display:flex;flex-direction:column;align-items:center;gap:2px;
-  background:none;border:none;cursor:pointer;padding:8px 28px;
-  border-radius:10px;transition:all .15s;
-  color:var(--secondary);font-family:var(--font)
-}
-.mobile-nav-tab.active{color:var(--blue)}
-.mobile-nav-tab:active{transform:scale(.9)}
-.mobile-nav-icon{font-size:20px;line-height:1}
-.mobile-nav-label{font-size:10px;font-weight:600}
-
 /* Mobile layout */
 @media(max-width:767px){
   html,body{overflow-x:hidden;max-width:100vw}
@@ -54,15 +35,11 @@
   .top-subtitle{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:80px}
   .theme-card{width:34px;height:34px;font-size:15px}
   .top-spacer{display:none}
-  .cluster-card{
-    min-width:0;padding:6px 10px;gap:6px;
-    flex:1;border-radius:var(--radius-sm);
-    order:0
-  }
-  .cluster-card label{font-size:11px}
-  .cluster-card input[type=range]{height:6px;min-width:40px}
-  .cluster-card input[type=range]::-webkit-slider-thumb{width:22px;height:22px}
-  .cluster-card .val{font-size:12px;padding:2px 5px}
+
+  /* Hide desktop cluster control, show panel control on tablet */
+  #clusterCardDesktop{display:none}
+  .cluster-panel-control{display:block!important}
+  .cluster-vertical{display:none!important}
 
   /* Map controls: vertically constrained */
   .map-controls{
@@ -167,8 +144,24 @@
   }
   .toast.show{transform:translateY(0) scale(1);pointer-events:auto}
 
-  /* FAB position above nav bar */
-  .fab-add-stops{bottom:calc(70px + env(safe-area-inset-bottom))}
+  /* Map FAB column above the mobile nav bar */
+  .map-fabs{
+    left:16px;
+    bottom:calc(72px + env(safe-area-inset-bottom));
+    border-radius:14px
+  }
+  .map-fab{width:48px;height:48px}
+  .map-fab svg{width:18px;height:18px}
+
+  /* Quick-add pill spans the viewport on mobile, anchored above FABs */
+  .quick-add-pill{
+    left:16px;right:16px;width:auto;max-width:none;
+    bottom:calc(132px + env(safe-area-inset-bottom))
+  }
+
+  /* Mobile Plan view (full-screen sheet) covers the map; hide map-overlay UI. */
+  .bottom-sheet.mobile-plan-visible ~ .map-fabs,
+  .bottom-sheet.mobile-plan-visible ~ .quick-add-pill{display:none !important}
 
   /* Hide desktop panel toggle on mobile */
   .panel-toggle{display:none !important}
@@ -180,8 +173,10 @@
   .top-card{padding:4px 8px}
   .top-title{font-size:11px}
   .top-subtitle{display:none}
-  .cluster-card{padding:4px 8px;gap:4px}
-  .cluster-card label{font-size:10px}
+
+  /* Show vertical cluster control on mobile, hide panel control */
+  .cluster-vertical{display:flex!important;top:calc(44px + 70px);right:8px}
+  .cluster-panel-control{display:none!important}
   .travel-mode-bar{padding:4px 8px;gap:2px}
   .travel-mode-btn{padding:4px 6px}
   .travel-mode-icon{font-size:11px}
@@ -204,6 +199,22 @@
   }
   .map-ctrl-btn{width:34px;height:34px;font-size:14px}
   .map-ctrl-btn+.map-ctrl-btn{border-top:none}
+
+  /* Landscape: shrink FAB column + cap quick-add pill width */
+  .map-fabs{
+    left:12px;
+    bottom:calc(56px + env(safe-area-inset-bottom));
+    flex-direction:row
+  }
+  .map-fab{width:40px;height:40px}
+  .map-fab svg{width:16px;height:16px}
+  .map-fab+.map-fab{border-top:none;border-left:1px solid var(--separator)}
+  .quick-add-pill{
+    left:12px;right:auto;width:340px;max-width:calc(100vw - 24px);
+    bottom:calc(108px + env(safe-area-inset-bottom))
+  }
+  .quick-add-list{max-height:180px}
+
   .stop-item{padding:6px 10px}
   .route-summary{padding:6px 10px}
   .route-stat-val{font-size:12px}
