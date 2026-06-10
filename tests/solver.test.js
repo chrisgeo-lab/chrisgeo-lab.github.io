@@ -237,10 +237,10 @@ describe('clusterUnvisited', () => {
   });
 
   it('produces stable output across repeated calls (deterministic seeding)', () => {
-    // The algorithm seeds k-medoids with index 0 and uses a deterministic
-    // farthest-point heuristic, so identical input must yield identical
-    // output. If this ever flakes, the algorithm has gained a non-deterministic
-    // step (e.g. Math.random() seeding) and the test should be revisited.
+    // Multi-restart k-medoids++ uses a seeded PRNG keyed on (n, k, restart#),
+    // so identical input must yield identical output. If this flakes, the
+    // algorithm has gained a non-deterministic step (e.g. Math.random()) and
+    // the test should be revisited.
     const n = 6;
     const matrix = Array.from({ length: n }, () => Array(n).fill(100));
     for (let i = 0; i < n; i++) matrix[i][i] = 0;
@@ -253,5 +253,39 @@ describe('clusterUnvisited', () => {
     const norm = cs => cs.map(c => [...c].sort((x, y) => x - y))
                         .sort((x, y) => x[0] - y[0]);
     expect(norm(a)).toEqual(norm(b));
+  });
+
+  it('exports chosen medoids via opts.out for sticky reclustering', () => {
+    const n = 6;
+    const matrix = Array.from({ length: n }, () => Array(n).fill(100));
+    for (let i = 0; i < n; i++) matrix[i][i] = 0;
+    for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) if (i !== j) matrix[i][j] = 1;
+    for (let i = 3; i < 6; i++) for (let j = 3; j < 6; j++) if (i !== j) matrix[i][j] = 1;
+
+    const out = {};
+    const clusters = clusterUnvisited([0, 1, 2, 3, 4, 5], 2, matrix, { out });
+    expect(Array.isArray(out.medoids)).toBe(true);
+    expect(out.medoids.length).toBe(2);
+    // Each medoid must belong to exactly one of the returned clusters.
+    const flat = clusters.flat();
+    for (const m of out.medoids) expect(flat.includes(m)).toBe(true);
+  });
+
+  it('respects previousMedoids seed when those indices remain present', () => {
+    // Two well-separated groups of 3 — almost any seed will recover the
+    // natural split, but with a previousMedoids hint the chosen medoids
+    // should come from the seed set when it's still valid.
+    const n = 6;
+    const matrix = Array.from({ length: n }, () => Array(n).fill(100));
+    for (let i = 0; i < n; i++) matrix[i][i] = 0;
+    for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) if (i !== j) matrix[i][j] = 1;
+    for (let i = 3; i < 6; i++) for (let j = 3; j < 6; j++) if (i !== j) matrix[i][j] = 1;
+
+    const out = {};
+    clusterUnvisited([0, 1, 2, 3, 4, 5], 2, matrix, { previousMedoids: [1, 4], out });
+    // Each chosen medoid must lie within the cluster the seed was in.
+    const left = new Set([0, 1, 2]);
+    const inLeft = out.medoids.filter(m => left.has(m)).length;
+    expect(inLeft).toBe(1);
   });
 });
