@@ -4,11 +4,14 @@ import { setView, zoomIn, zoomOut } from './map.js';
 import { render, renderView, renderStopList, toggleVisited, computeMaxClusters,
   setSheetState, toggleRouteDropdown, closeRouteDropdown } from './ui.js';
 import { exportRoute, exportToGoogleMaps, exportToAppleMaps } from './exports.js';
+import { showShareModal } from './share.js';
 import { showHomeModal, hideHomeModal, confirmHome, showStartModal, hideStartModal, confirmStart } from './modals.js';
-import { showAddrModal, hideAddrModal, resetToDefaultStops, clearAllAppData, setupAutocomplete, parsePastedText, addManualAddress, confirmAddresses, initAddressUI, setImportMode } from './address-manager.js';
+import { showAddrModal, hideAddrModal, clearAllStops, setupAutocomplete, parsePastedText, confirmAddresses, initAddressUI, setImportMode } from './address-manager.js';
+import { openQuickAdd, closeQuickAdd, isQuickAddOpen } from './quick-add.js';
 import { startTour, resetTour, dismissTour, isTourActive } from './tour.js';
 import { requestLocationWithPrompt } from './geolocation.js';
 import { SLIDER_DEBOUNCE_MS, MOBILE_BREAKPOINT_PX, DEFAULT_ZOOM_FOR_GPS } from './constants.js';
+import { confirm } from './confirm.js';
 
 function isMobile() { return window.innerWidth < MOBILE_BREAKPOINT_PX; }
 
@@ -54,28 +57,79 @@ export function initWiring() {
     if (!e.target.closest('.filter-row')) closeRouteDropdown();
   });
 
-  // Cluster slider
+  // Cluster sliders (sync all three controls)
   const slider = document.getElementById('clusterSlider');
   const sliderVal = document.getElementById('clusterVal');
+  const sliderMobile = document.getElementById('clusterSliderMobile');
+  const sliderValMobile = document.getElementById('clusterValMobile');
+  const sliderPanel = document.getElementById('clusterSliderPanel');
+  const sliderValPanel = document.getElementById('clusterPanelVal');
+  const clusterDecrease = document.getElementById('clusterDecrease');
+  const clusterIncrease = document.getElementById('clusterIncrease');
+
   let sliderTO = null;
-  slider.oninput = () => { sliderVal.textContent = slider.value; state.numClusters = +slider.value; state.activeFilter = -1; clearTimeout(sliderTO); sliderTO = setTimeout(render, SLIDER_DEBOUNCE_MS); };
+
+  function updateAllClusterControls(value) {
+    const val = +value;
+    state.numClusters = val;
+    state.activeFilter = -1;
+    sliderVal.textContent = val;
+    sliderValMobile.textContent = val;
+    sliderValPanel.textContent = val;
+    slider.value = val;
+    sliderMobile.value = val;
+    sliderPanel.value = val;
+    clearTimeout(sliderTO);
+    sliderTO = setTimeout(render, SLIDER_DEBOUNCE_MS);
+  }
+
+  slider.oninput = () => updateAllClusterControls(slider.value);
+  sliderMobile.oninput = () => updateAllClusterControls(sliderMobile.value);
+  sliderPanel.oninput = () => updateAllClusterControls(sliderPanel.value);
+  clusterDecrease.onclick = () => { const val = Math.max(1, state.numClusters - 1); updateAllClusterControls(val); };
+  clusterIncrease.onclick = () => { const val = Math.min(computeMaxClusters(), state.numClusters + 1); updateAllClusterControls(val); };
 
   const MAX_CLUSTERS = computeMaxClusters();
   slider.max = MAX_CLUSTERS;
   slider.setAttribute('max', MAX_CLUSTERS);
+  sliderMobile.max = MAX_CLUSTERS;
+  sliderMobile.setAttribute('max', MAX_CLUSTERS);
+  sliderPanel.max = MAX_CLUSTERS;
+  sliderPanel.setAttribute('max', MAX_CLUSTERS);
+
+  // Sync slider DOM values from state on init. The HTML markup hard-codes
+  // value="1", so a shared link or a stored state with numClusters > 1 would
+  // otherwise show "Split into 1 route" while the planner produced N. Clamp
+  // to the live max so we never render an out-of-range value.
+  const initialClusters = Math.max(1, Math.min(MAX_CLUSTERS, state.numClusters || 1));
+  state.numClusters = initialClusters;
+  slider.value = initialClusters;
+  sliderMobile.value = initialClusters;
+  sliderPanel.value = initialClusters;
+  sliderVal.textContent = initialClusters;
+  sliderValMobile.textContent = initialClusters;
+  sliderValPanel.textContent = initialClusters;
 
   // Buttons
-  document.getElementById('resetBtn').onclick = () => {
-    if (!state.visitedSet.size || confirm('Reset all progress?')) { state.visitedSet.clear(); saveSet(STORE_V, state.visitedSet); state.durationMatrix = null; render(); toast('Reset'); }
+  document.getElementById('resetBtn').onclick = async () => {
+    if (!state.visitedSet.size) { state.visitedSet.clear(); saveSet(STORE_V, state.visitedSet); state.durationMatrix = null; render(); toast('Reset'); return; }
+    const confirmed = await confirm('Reset all progress? This will unmark all visited stops.', { okText: 'Reset', dangerous: true });
+    if (confirmed) { state.visitedSet.clear(); saveSet(STORE_V, state.visitedSet); state.durationMatrix = null; render(); toast('Reset'); }
   };
   document.getElementById('setHomeBtn').onclick = showHomeModal;
   document.getElementById('setStartBtn').onclick = showStartModal;
-  document.getElementById('topCard').onclick = () => {
+  const topCard = document.getElementById('topCard');
+  const toggleTopCard = () => {
     if (isMobile()) { switchMobileView('plan'); }
     else { setSheetState(state.sheetState === 'expanded' ? 'peek' : 'expanded'); }
   };
+  topCard.onclick = toggleTopCard;
+  topCard.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleTopCard(); }
+  });
   document.getElementById('gmapsFullRouteBtn').onclick = exportToGoogleMaps;
   document.getElementById('appleMapsBtn').onclick = exportToAppleMaps;
+  document.getElementById('shareRouteBtn').onclick = showShareModal;
 
   // Panel toggle
   let panelHidden = false;
@@ -84,7 +138,9 @@ export function initWiring() {
     document.getElementById('bottomSheet').classList.toggle('panel-hidden', panelHidden);
     document.querySelector('.map-controls').classList.toggle('panel-hidden', panelHidden);
     document.getElementById('panelToggle').classList.toggle('panel-hidden', panelHidden);
-    document.getElementById('panelToggle').innerHTML = panelHidden ? '&#9664;' : '&#9654;';
+    document.getElementById('panelToggle').innerHTML = panelHidden
+      ? '<svg viewBox="0 0 12 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 4l-4 4 4 4"/></svg>'
+      : '<svg viewBox="0 0 12 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4l4 4-4 4"/></svg>';
   };
 
   // Map controls
@@ -108,9 +164,10 @@ export function initWiring() {
     }
   };
   document.getElementById('toggleVisitedBtn').onclick = () => {
+    // Locked on while the Visited filter is active — there's nothing else to
+    // show. The dropdown selection is the right way to leave that view.
+    if (state.activeFilter === -2) { toast('Visited filter is active'); return; }
     state.showVisitedMarkers = !state.showVisitedMarkers;
-    document.getElementById('toggleVisitedBtn').style.opacity = state.showVisitedMarkers ? '1' : '.5';
-    document.getElementById('toggleVisitedBtn').style.color = state.showVisitedMarkers ? 'var(--green)' : '';
     state.suppressFitBounds = true;
     renderView();
   };
@@ -121,6 +178,7 @@ export function initWiring() {
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
       if (isTourActive()) { dismissTour(); return; }
+      if (isQuickAddOpen()) { closeQuickAdd(); return; }
       if (document.getElementById('addrModal').classList.contains('show')) { hideAddrModal(); return; }
       if (document.getElementById('homeModal').classList.contains('show')) { hideHomeModal(); return; }
       if (document.getElementById('startModal').classList.contains('show')) { hideStartModal(); return; }
@@ -131,6 +189,7 @@ export function initWiring() {
     else if (e.key === 'r' || e.key === 'R') { document.getElementById('resetBtn').click(); }
     else if (e.key === 'e') exportToGoogleMaps();
     else if (e.key === 'E') exportRoute();
+    else if (e.key === 's' || e.key === 'S') showShareModal();
     else if (e.key === '=' || e.key === '+') zoomIn();
     else if (e.key === '-') zoomOut();
     else if (e.key === '?') { resetTour(); startTour(render); }
@@ -155,41 +214,35 @@ export function initWiring() {
   document.getElementById('startInput').onkeydown = (e) => { if (e.key === 'Enter') confirmStart(); };
   document.getElementById('startModal').onclick = e => { if (e.target.id === 'startModal') hideStartModal(); };
 
-  // Address manager
+  // Map FABs (bottom-left): quick-add + clear-all.
+  document.getElementById('addStopFab').onclick = () => {
+    if (isQuickAddOpen()) closeQuickAdd();
+    else openQuickAdd();
+  };
+  document.getElementById('clearStopsFab').onclick = async () => {
+    if (!state.SPOTS.length) return;
+    const n = state.SPOTS.length;
+    const ok = await confirm(`Remove all ${n} stop${n === 1 ? '' : 's'}? Your start and end points are kept.`, { okText: 'Clear', dangerous: true });
+    if (!ok) return;
+    const undo = clearAllStops();
+    toast(`Cleared ${n} stop${n === 1 ? '' : 's'}`, undo ? { undo } : undefined);
+  };
+
+  // Address manager (bulk + power-user surface)
   document.getElementById('manageStopsBtn').onclick = showAddrModal;
-  document.getElementById('emptyImportBtn').onclick = showAddrModal;
+  // Empty-state CTA → quick-add (most users want a single address).
+  document.getElementById('emptyImportBtn').onclick = openQuickAdd;
+  // Inline "Manage" badge → bulk modal.
   document.getElementById('importStopsInlineBtn').onclick = showAddrModal;
-  document.getElementById('fabAddStops').onclick = showAddrModal;
-  document.getElementById('addrCancelBtn').onclick = hideAddrModal;
   document.getElementById('addrCloseBtnX').onclick = hideAddrModal;
   document.getElementById('addrModal').onclick = e => { if (e.target.id === 'addrModal') hideAddrModal(); };
   document.getElementById('addrParseBtn').onclick = parsePastedText;
-  document.getElementById('addrManualAddBtn').onclick = addManualAddress;
-  ['addrManualStreet', 'addrManualCity', 'addrManualState', 'addrManualZip'].forEach(id => {
-    document.getElementById(id).onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); addManualAddress(); } };
-  });
   document.getElementById('addrConfirmBtn').onclick = confirmAddresses;
-  document.getElementById('addrResetDefaultBtn').onclick = resetToDefaultStops;
-  document.getElementById('addrClearDataBtn').onclick = clearAllAppData;
   document.getElementById('addrModeAppend').onclick = () => setImportMode('append');
   document.getElementById('addrModeReplace').onclick = () => setImportMode('replace');
 
   // Init address file drop zone and tabs
   initAddressUI();
-
-  // Autocomplete for manual add
-  setupAutocomplete(
-    document.getElementById('addrManualSearch'),
-    document.getElementById('addrAcList'),
-    {pick({street, city, state: st, zip}) {
-      document.getElementById('addrManualStreet').value = street;
-      document.getElementById('addrManualCity').value = city;
-      document.getElementById('addrManualState').value = st;
-      document.getElementById('addrManualZip').value = zip;
-      document.getElementById('addrManualSearch').value = street + (city ? ', ' + city : '');
-      document.getElementById('addrManualStreet').focus();
-    }}
-  );
 
   // Autocomplete for home (end point)
   setupAutocomplete(
@@ -237,7 +290,6 @@ export function initWiring() {
   });
 
   // Initial UI sync that depends on DOM being wired.
-  document.getElementById('progressBar').style.width = `${state.SPOTS.length ? (state.visitedSet.size / state.SPOTS.length) * 100 : 0}%`;
   updateTravelModeUI();
   updateGPSButtonState();
 

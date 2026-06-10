@@ -29,7 +29,11 @@ export const map = new maplibregl.Map({
   touchZoomRotate: true,
   doubleClickZoom: true,
   touchPitch: false,
-  keyboard: true
+  keyboard: true,
+  // theme.js snapshots the WebGL canvas via drawImage during a theme swap, so
+  // the buffer must persist past the present() call — otherwise the cloned
+  // canvas comes out blank.
+  preserveDrawingBuffer: true
 });
 
 let mapLoaded = false;
@@ -40,8 +44,9 @@ export const mapReady = new Promise(resolve => {
 
 darkQuery.addEventListener('change', () => {
   if (document.documentElement.hasAttribute('data-theme')) return;
-  map.setStyle(getStyle(isDark()));
-  map.once('style.load', () => restoreLayers());
+  // diff:false forces a full style rebuild so style.load fires reliably and
+  // our restoreLayers handler re-adds the route polylines + 3D buildings.
+  map.setStyle(getStyle(isDark()), {diff: false});
 });
 
 let markers = [];
@@ -51,10 +56,13 @@ let routeData = [];
 let sourceCounter = 0;
 let renderEpoch = 0;
 
-function restoreLayers() {
-  add3DBuildings();
+export function restoreLayers() {
+  // Guard: add3DBuildings reads map.getStyle().layers, which can throw mid
+  // style-swap. If it does, we MUST still restore route polylines.
+  try { add3DBuildings(); } catch (e) { console.warn('restoreLayers: 3D buildings skipped', e); }
   routeData.forEach(({id, geojson, color, weight}) => {
-    try { addRouteLayer(id, geojson, color, weight); } catch {}
+    try { addRouteLayer(id, geojson, color, weight); }
+    catch (e) { console.warn('restoreLayers: route layer failed', id, e); }
   });
 }
 
@@ -79,7 +87,9 @@ function add3DBuildings() {
   }, beforeId);
 }
 
-map.on('style.load', () => { add3DBuildings(); });
+// Replay polylines + 3D buildings on every style swap so theme toggles don't
+// drop the route lines (sources are owned by the previous style and disappear).
+map.on('style.load', () => { restoreLayers(); });
 
 /** Remove all markers, popups, and route layers; bumps the render epoch to invalidate pending adds. */
 export function clearMap() {
@@ -115,14 +125,16 @@ export function addMarker(lat, lng, icon) {
     console.warn('addMarker: invalid lat/lng', lat, lng);
     return { _invalid: true, getLngLat: () => null, getElement: () => null, remove() {}, _el: null };
   }
+  // 44x44 hit-area wrapping the visible icon. Meets WCAG touch target minimum
+  // without inflating the visual marker. We set pointer-events:auto inline-
+  // !important so we win against the css/map.css rule that disables pointer
+  // events on .maplibregl-marker (needed there so pan/zoom work over markers
+  // on the canvas).
   const el = document.createElement('div');
+  el.className = 'marker-hit';
+  el.style.cssText = 'width:44px;height:44px;display:flex;align-items:center;justify-content:center;cursor:pointer';
+  el.style.setProperty('pointer-events', 'auto', 'important');
   el.innerHTML = icon.html;
-  el.style.cursor = 'pointer';
-  const firstChild = el.firstElementChild;
-  if (firstChild) {
-    el.style.width = firstChild.style.width;
-    el.style.height = firstChild.style.height;
-  }
   const marker = new maplibregl.Marker({element: el, anchor: 'center'})
     .setLngLat([lng, lat])
     .addTo(map);
@@ -165,42 +177,66 @@ export function addPolyline(coords, color, weight = 5) {
 }
 
 function addRouteLayer(id, geojson, color, weight) {
-  if (map.getSource(id)) return;
-  map.addSource(id, {type: 'geojson', data: geojson});
-  map.addLayer({
-    id: id + '-outline',
-    type: 'line',
-    source: id,
-    paint: {'line-color': '#000', 'line-width': weight + 3, 'line-opacity': 0.15},
-    layout: {'line-cap': 'round', 'line-join': 'round'}
-  });
-  map.addLayer({
-    id: id,
-    type: 'line',
-    source: id,
-    paint: {'line-color': color, 'line-width': weight, 'line-opacity': 0.9},
-    layout: {'line-cap': 'round', 'line-join': 'round'}
-  });
+  // After map.setStyle() the source may persist while the layers are dropped
+  // (MapLibre's diff strips layers not present in the new style). Add the
+  // source only if missing, and always re-add any missing layers.
+  if (!map.getSource(id)) {
+    map.addSource(id, {type: 'geojson', data: geojson});
+  }
+  if (!map.getLayer(id + '-outline')) {
+    map.addLayer({
+      id: id + '-outline',
+      type: 'line',
+      source: id,
+      paint: {'line-color': '#000', 'line-width': weight + 3, 'line-opacity': 0.15},
+      layout: {'line-cap': 'round', 'line-join': 'round'}
+    });
+  }
+  if (!map.getLayer(id)) {
+    map.addLayer({
+      id: id,
+      type: 'line',
+      source: id,
+      paint: {'line-color': color, 'line-width': weight, 'line-opacity': 0.9},
+      layout: {'line-cap': 'round', 'line-join': 'round'}
+    });
+  }
 }
 
 /**
  * Build an HTML icon descriptor for a numbered stop marker.
+ * Visual styling lives in css/map.css under `.map-pin` — this only sets the
+ * route color via a CSS custom property and toggles state classes.
  * @param {number|string} n  Stop number (or check glyph when visited).
  * @param {string} color
  * @param {boolean} vis      Visited — dim and show check.
  * @param {boolean} curr     Current next-stop — enlarge and add glow.
  */
 export function stopIcon(n, color, vis, curr) {
-  const sz = curr ? 26 : 22, op = vis ? 0.4 : 1;
-  const bdr = curr ? '2.5px solid #fff' : '1.5px solid rgba(255,255,255,.8)';
-  const content = vis ? '&#10003;' : n;
-  const glow = curr ? `box-shadow:0 0 0 4px ${color}40,0 2px 8px rgba(0,0,0,.3)` : 'box-shadow:0 2px 6px rgba(0,0,0,.3)';
-  return {html: `<div style="width:${sz}px;height:${sz}px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;font-size:${curr ? 11 : 9}px;color:#fff;${glow};border:${bdr};opacity:${op}">${content}</div>`};
+  const cls = ['map-pin', 'map-pin-stop'];
+  if (vis) cls.push('is-visited');
+  if (curr) cls.push('is-current');
+  const content = vis
+    ? '<svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 5.5l2 2 4-4.5"/></svg>'
+    : `<span class="map-pin-num">${n}</span>`;
+  return {html:
+    `<div class="${cls.join(' ')}" style="--pin-color:${color}">` +
+      `<span class="map-pin-content">${content}</span>` +
+    '</div>'
+  };
 }
 
 /** HTML icon descriptor for the home (end-point) marker. */
 export function homeIcon() {
-  return {html: '<div style="width:22px;height:22px;border-radius:50%;background:#FF9500;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;box-shadow:0 2px 6px rgba(255,149,0,.4);border:1.5px solid #fff">&#9750;</div>'};
+  return {html:
+    '<div class="map-pin map-pin-home" style="--pin-color:#ff9f0a">' +
+      '<span class="map-pin-content">' +
+        '<svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+          '<path d="M2 7l5-4.5L12 7v5H2z"/><path d="M5.5 12V8.5h3V12"/>' +
+        '</svg>' +
+      '</span>' +
+    '</div>'
+  };
 }
 
 /** HTML icon descriptor for the live GPS dot (pulsing ring). */
@@ -274,6 +310,42 @@ export function fitBounds(bounds, opts) {
     const camera = map.cameraForBounds(bounds, opts);
     if (camera) map.jumpTo(camera);
   }
+}
+
+/**
+ * Animated camera move — preferred for "preview while typing" because
+ * `flyTo` is more readable than the abrupt easeTo used by `setView`.
+ * @param {number} lat
+ * @param {number} lng
+ * @param {number} [zoom=15]
+ */
+export function flyTo(lat, lng, zoom = 15) {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+  map.stop();
+  map.flyTo({center: [lng, lat], zoom, duration: 800, essential: true});
+}
+
+let previewPin = null;
+/**
+ * Drop or move an ephemeral preview pin (non-interactive). Used by quick-add
+ * to show the user where a typed/highlighted address lands BEFORE they
+ * commit. Returns the marker so callers can introspect; pass nothing to
+ * remove.
+ */
+export function addPreviewPin(lat, lng) {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  if (previewPin) { previewPin.remove(); previewPin = null; }
+  const el = document.createElement('div');
+  el.className = 'preview-pin';
+  el.style.cssText = 'pointer-events:none';
+  el.innerHTML = '<div class="preview-pin-pulse"></div><div class="preview-pin-core"></div>';
+  previewPin = new maplibregl.Marker({element: el, anchor: 'bottom'})
+    .setLngLat([lng, lat])
+    .addTo(map);
+  return previewPin;
+}
+export function removePreviewPin() {
+  if (previewPin) { previewPin.remove(); previewPin = null; }
 }
 
 /** Zoom in one level (150ms ease). */

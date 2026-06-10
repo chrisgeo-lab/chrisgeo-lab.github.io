@@ -6,7 +6,7 @@
 //
 // All persistence goes through here so callers don't need to know which
 // localStorage key holds which anchor, and so spotId invalidation has one
-// home rather than being repeated in planner.js / addresses.js / modals.js.
+// home rather than being repeated in planner.js / address-manager.js / modals.js.
 
 import { state, STORE_H, STORE_START, saveJSON } from './state.js';
 

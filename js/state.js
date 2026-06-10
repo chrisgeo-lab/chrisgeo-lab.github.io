@@ -38,6 +38,15 @@ import { toast } from './utils.js';
 export const DEFAULT_SPOTS = [];
 export const STORE_SPOTS = 'routeflow-spots';
 export const COLORS = ['#007AFF','#34C759','#FF9500','#AF52DE','#FF2D55','#5AC8FA','#5856D6','#FF6482'];
+// Single source of truth for the "visited / orphaned route" marker color.
+// Matches `--tertiary` in css/base.css so the dropdown dot, stop list section
+// header, and visited markers on the map all read as the same gray.
+export const VISITED_COLOR = '#8e8e94';
+// Single-route default — used for the unrouted preview, the "All Routes"
+// dropdown indicator, and any place we need "the primary route blue".
+// Aligned to COLORS[0] so the cluster-1 route and the unrouted preview
+// render identically.
+export const PRIMARY_ROUTE_COLOR = COLORS[0];
 export const STOP_MIN = 3;
 // Routing API profiles with primary + fallback servers.
 // OSRM: /{table,route}/v1/driving/{coords}
@@ -64,10 +73,12 @@ export const OSRM_PROFILES = {
 };
 export const STORE_V = 'routeflow-visited';
 export const STORE_ROUTE_MAP = 'routeflow-visited-routes'; // Maps spot ID → route index
+export const STORE_ROUTE_OVERRIDES = 'routeflow-route-overrides'; // Maps spot ID → manually-pinned route index
 export const STORE_H = 'routeflow-home';
 export const STORE_START = 'routeflow-start';
 export const STORE_CACHE = 'routeflow-osrm-cache';
 export const STORE_TRAVEL_MODE = 'routeflow-travel-mode';
+export const STORE_START_MODE = 'routeflow-start-mode'; // 'auto' | 'none'
 export const CACHE_MAX_ENTRIES = 50;
 
 // Migrate legacy localStorage keys (festival-* → routeflow-*)
@@ -139,6 +150,8 @@ export function saveJSON(k, v) {
  * @returns {Anchor|null}
  */
 export function getStartLocation() {
+  // Explicit "no origin" — route begins at the first optimized stop.
+  if (state.startMode === 'none') return null;
   if (state.startPoint && Number.isFinite(state.startPoint.lat) && Number.isFinite(state.startPoint.lng)) {
     return state.startPoint;
   }
@@ -174,7 +187,7 @@ function loadSpots() {
 /**
  * Singleton mutable app state. Imported (not passed) by every module.
  * Field ownership / mutation map:
- *   SPOTS, visitedSet, home, startPoint  — addresses.js, modals.js, tour.js (write); planner.js, ui.js (read)
+ *   SPOTS, visitedSet, home, startPoint  — address-manager.js, modals.js, tour.js (write); planner.js, ui.js (read)
  *   numClusters, activeFilter            — wiring.js, ui.js (write); planner.js (read)
  *   currentRoutes, durationMatrix        — planner.js, routing.js (write); ui.js, exports.js (read)
  *   gpsPos                               — geolocation.js, wiring.js (write); ui.js, planner.js (read)
@@ -187,9 +200,14 @@ export const state = {
   SPOTS: loadSpots(),
   visitedSet: loadSet(STORE_V),
   visitedRouteMap: loadJSON(STORE_ROUTE_MAP) || {}, // Maps spot ID → route index when visited
+  // Manual route assignments. Maps spot ID → route index (0-based). When a spot
+  // appears here, the planner forces it into that cluster instead of letting
+  // k-medoids choose. Indices outside [0, numClusters) are ignored at solve time.
+  routeOverrides: loadJSON(STORE_ROUTE_OVERRIDES) || {},
   // Validate anchors from localStorage — corrupt data (missing lat/lng) causes crashes.
   home: validateAnchor(loadJSON(STORE_H)),
   startPoint: validateAnchor(loadJSON(STORE_START)),
+  startMode: (localStorage.getItem(STORE_START_MODE) === 'none') ? 'none' : 'auto',
   numClusters: 1,
   activeFilter: -1,
   currentRoutes: [],
@@ -203,5 +221,8 @@ export const state = {
   demoMode: false,
   sheetState: 'peek',
   travelMode: loadJSON(STORE_TRAVEL_MODE) || 'car',
-  gpsState: 'unknown' // 'unknown' | 'granted' | 'denied' | 'unavailable'
+  gpsState: 'unknown', // 'unknown' | 'granted' | 'denied' | 'unavailable'
+  // Stop currently highlighted in the side panel due to a marker click.
+  // null = no highlight. Cleared on full re-renders.
+  focusedStopId: null
 };

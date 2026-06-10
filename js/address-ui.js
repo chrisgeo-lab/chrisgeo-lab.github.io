@@ -1,7 +1,7 @@
 import { state } from './state.js';
-import { esc, toast, trapFocus } from './utils.js';
+import { esc, trapFocus } from './utils.js';
 import { computeMaxClusters } from './ui.js';
-import { bindPhotonSearch, photonFeatureToAddress } from './photon.js';
+export { setupAutocomplete } from './addr-autocomplete.js';
 
 let releaseAddrTrap = null;
 
@@ -14,21 +14,14 @@ export function showAddrModal(modalState) {
   modal.classList.add('show');
   releaseAddrTrap = trapFocus(modal);
 
-  modalState.stagedAddresses.length = 0; // Clear staged
+  modalState.stagedAddresses.length = 0;
   modalState.renderPreview();
 
   const hasExisting = state.SPOTS.length > 0;
   document.getElementById('addrModeToggle').style.display = hasExisting ? 'flex' : 'none';
   modalState.setImportMode(hasExisting ? 'append' : 'replace');
 
-  // Clear form fields
   document.getElementById('addrPasteArea').value = '';
-  document.getElementById('addrManualSearch').value = '';
-  document.getElementById('addrManualStreet').value = '';
-  document.getElementById('addrManualCity').value = '';
-  document.getElementById('addrManualState').value = '';
-  document.getElementById('addrManualZip').value = '';
-  document.getElementById('addrAcList').classList.remove('show');
 
   // Reset to import tab
   document.querySelectorAll('.addr-tab').forEach(t => t.classList.remove('active'));
@@ -60,26 +53,31 @@ export function renderAddrPreview(stagedAddresses) {
   if (!stagedAddresses.length) {
     el.style.display = 'none';
     btn.disabled = true;
-    count.textContent = '0 addresses staged';
+    btn.textContent = 'Add stops';
+    count.textContent = 'No addresses yet';
     return;
   }
 
   el.style.display = 'block';
   btn.disabled = false;
   const geocoded = stagedAddresses.filter(a => a.status === 'ok').length;
-  count.textContent = `${stagedAddresses.length} addresses staged${geocoded ? ` (${geocoded} geocoded)` : ''}`;
+  const n = stagedAddresses.length;
+  btn.textContent = `Add ${n} ${n === 1 ? 'stop' : 'stops'}`;
+  count.textContent = geocoded
+    ? `${n} ${n === 1 ? 'address' : 'addresses'} · ${geocoded} verified`
+    : `${n} ${n === 1 ? 'address' : 'addresses'} ready`;
 
   el.innerHTML = '';
   stagedAddresses.forEach((addr, i) => {
     const item = document.createElement('div');
     item.className = 'addr-preview-item';
     const statusClass = addr.status === 'ok' ? 'ok' : addr.status === 'error' ? 'error' : 'pending';
-    const statusText = addr.status === 'ok' ? '&#10003;' : addr.status === 'error' ? '&#10007;' : '&#8987;';
+    const statusText = addr.status === 'ok' ? 'OK' : addr.status === 'error' ? 'Error' : 'Pending';
     item.innerHTML = `
       <span class="addr-preview-num">${i + 1}</span>
       <span class="addr-preview-text">${esc(addr.street)}${addr.city ? ', ' + esc(addr.city) : ''}${addr.state ? ', ' + esc(addr.state) : ''}${addr.zip ? ' ' + esc(addr.zip) : ''}</span>
       <span class="addr-preview-status ${statusClass}">${statusText}</span>
-      <button class="addr-preview-remove" data-idx="${i}">&times;</button>`;
+      <button class="addr-preview-remove" data-idx="${i}" aria-label="Remove address"><svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M3 3l7 7M10 3l-7 7"/></svg></button>`;
     item.querySelector('.addr-preview-remove').onclick = () => {
       stagedAddresses.splice(i, 1);
       stagedAddresses.forEach((a, j) => a.id = j + 1);
@@ -87,59 +85,6 @@ export function renderAddrPreview(stagedAddresses) {
     };
     el.appendChild(item);
   });
-}
-
-/**
- * Setup Photon autocomplete for address input.
- * @param {HTMLElement} inputEl - Input element
- * @param {HTMLElement} listEl - Dropdown list element
- * @param {Object} onSelect - { pick: fn, onEnter: fn }
- */
-export function setupAutocomplete(inputEl, listEl, onSelect) {
-  let activeIdx = -1, results = [];
-
-  bindPhotonSearch(inputEl, (features) => {
-    results = features;
-    activeIdx = -1;
-    if (results.length) { listEl.classList.add('show'); renderList(); }
-    else listEl.classList.remove('show');
-  });
-
-  inputEl.addEventListener('keydown', e => {
-    if (!listEl.classList.contains('show')) {
-      if (e.key === 'Enter' && onSelect.onEnter) { e.preventDefault(); onSelect.onEnter(); return; }
-      return;
-    }
-    if (e.key === 'ArrowDown') { e.preventDefault(); activeIdx = Math.min(activeIdx + 1, results.length - 1); renderList(); }
-    else if (e.key === 'ArrowUp') { e.preventDefault(); activeIdx = Math.max(activeIdx - 1, 0); renderList(); }
-    else if (e.key === 'Enter') {
-      e.preventDefault();
-      if (activeIdx >= 0 && results[activeIdx]) pick(results[activeIdx]);
-      else if (results.length) pick(results[0]);
-    } else if (e.key === 'Escape') { listEl.classList.remove('show'); }
-  });
-
-  inputEl.addEventListener('blur', () => setTimeout(() => listEl.classList.remove('show'), 200));
-
-  function renderList() {
-    listEl.innerHTML = '';
-    results.forEach((f, i) => {
-      const a = photonFeatureToAddress(f);
-      const sub = [a.city, a.state, a.zip, a.country].filter(Boolean).join(', ');
-      const item = document.createElement('div');
-      item.className = 'addr-ac-item' + (i === activeIdx ? ' active' : '');
-      item.innerHTML = `<div class="addr-ac-item-main">${esc(a.street || a.name)}</div><div class="addr-ac-item-sub">${esc(sub)}</div>`;
-      item.onmousedown = e => { e.preventDefault(); pick(f); };
-      listEl.appendChild(item);
-    });
-  }
-
-  function pick(f) {
-    const a = photonFeatureToAddress(f);
-    listEl.classList.remove('show');
-    results = [];
-    onSelect.pick({street: a.street, city: a.city, state: a.state, zip: a.zip, feature: f});
-  }
 }
 
 /**
@@ -172,16 +117,40 @@ export function initAddressUI(onFileProcess) {
 
 /**
  * Update cluster slider max based on number of stops.
+ * Also syncs mobile and panel sliders, and shows/hides controls.
  */
 export function updateClusterSlider() {
   const slider = document.getElementById('clusterSlider');
   const sliderVal = document.getElementById('clusterVal');
+  const sliderMobile = document.getElementById('clusterSliderMobile');
+  const sliderValMobile = document.getElementById('clusterValMobile');
+  const sliderPanel = document.getElementById('clusterSliderPanel');
+  const sliderValPanel = document.getElementById('clusterPanelVal');
+  const clusterVertical = document.getElementById('clusterVertical');
+  const clusterPanelControl = document.getElementById('clusterPanelControl');
+
   const newMax = computeMaxClusters();
+  const shouldShow = newMax > 1;
+
+  // Update max for all sliders
   slider.max = newMax;
   slider.setAttribute('max', newMax);
+  sliderMobile.max = newMax;
+  sliderMobile.setAttribute('max', newMax);
+  sliderPanel.max = newMax;
+  sliderPanel.setAttribute('max', newMax);
+
+  // Sync values if current exceeds new max
   if (+slider.value > newMax) {
     slider.value = newMax;
     sliderVal.textContent = newMax;
+    sliderMobile.value = newMax;
+    sliderValMobile.textContent = newMax;
+    sliderPanel.value = newMax;
+    sliderValPanel.textContent = newMax;
     state.numClusters = newMax;
   }
+
+  // Show/hide controls based on whether clustering is possible
+  clusterPanelControl.style.display = shouldShow ? 'block' : 'none';
 }

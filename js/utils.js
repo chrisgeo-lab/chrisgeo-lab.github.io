@@ -66,8 +66,32 @@ export function toast(msg, opts) {
   toastTimer = setTimeout(() => t.classList.remove('show'), opts && opts.undo ? 4000 : 2500);
 }
 
+// When a recalculation drags past this threshold the bottom sheet starts
+// shimmering. Tuned so quick local recalcs don't strobe the UI.
+const RECALC_SHIMMER_DELAY_MS = 1000;
+let recalcShimmerTimer = null;
+
+function setRecalculatingClass(on) {
+  const sheet = document.getElementById('bottomSheet');
+  if (sheet) sheet.classList.toggle('is-recalculating', !!on);
+}
+
 /** Toggle the global loading spinner overlay. */
-export function setLoading(v) { document.getElementById('loading').classList.toggle('active', v); }
+export function setLoading(v) {
+  document.getElementById('loading').classList.toggle('active', v);
+  if (v) {
+    // Defer the shimmer — only kicks in if the recalc takes long enough to feel laggy.
+    if (recalcShimmerTimer == null) {
+      recalcShimmerTimer = setTimeout(() => {
+        recalcShimmerTimer = null;
+        setRecalculatingClass(true);
+      }, RECALC_SHIMMER_DELAY_MS);
+    }
+  } else {
+    if (recalcShimmerTimer != null) { clearTimeout(recalcShimmerTimer); recalcShimmerTimer = null; }
+    setRecalculatingClass(false);
+  }
+}
 
 /**
  * Render the persistent error banner with optional retry button.

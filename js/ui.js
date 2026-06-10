@@ -1,32 +1,180 @@
-import { state, STOP_MIN, getStartLocation, getActiveRoutes } from './state.js';
+import { state, getStartLocation, getActiveRoutes, VISITED_COLOR, PRIMARY_ROUTE_COLOR } from './state.js';
 import { esc, fmtMi, fmtDur } from './utils.js';
-import { map, clearMap, addMarker, addPolyline, stopIcon, homeIcon, gpsIcon, trackPopup, setView, fitBounds, closePopup } from './map.js';
+import { map, clearMap, addMarker, addPolyline, stopIcon, homeIcon, gpsIcon, trackPopup, fitBounds, closePopup, setView } from './map.js';
 import { render } from './planner.js';
 import { toggleVisited, renderVisitedMarkersOnly, updateProgress } from './visited.js';
-import { renderFilterBar, renderStats, renderRouteSettings, renderVisitedOnlyView, updateStopsInfo } from './ui-panels.js';
-export { render, toggleVisited };
+import { renderFilterBar, renderStats, renderRouteSettings, updateStopsInfo } from './ui-panels.js';
+import { renderStopList, deleteStop } from './stop-list-render.js';
+export { render, toggleVisited, renderStopList, deleteStop };
 
-let gpsMarker = null;
+// Map: spotId → {marker, html}. Populated as renderView creates each marker.
+// Used to re-open the same popup when the user clicks a panel row instead of
+// a map marker.
+const stopMarkerRegistry = new Map();
 
-function bindPopup(marker, html) {
+function focusStopFromMarker(spotId) {
+  if (spotId == null) return;
+  console.log('[ui] focusStopFromMarker', spotId);
+  state.focusedStopId = spotId;
+  // Re-render only the side panel — full renderView would tear down all map
+  // markers and pop the popup we just opened.
+  try { renderStopList(); } catch {}
+  // Scroll the highlighted row into view (desktop). On mobile the panel is
+  // not visible until the user expands it; the highlight will already be in
+  // place when they switch to Plan view.
+  setTimeout(() => {
+    const row = document.querySelector(`.stop-item[data-spot-id="${spotId}"]`);
+    if (row) row.scrollIntoView({behavior: 'smooth', block: 'center'});
+  }, 50);
+}
+
+function openStopPopupAt(marker, html, spotId) {
+  const lngLat = marker.getLngLat && marker.getLngLat();
+  if (!lngLat) return;
+  closePopup();
+  if (spotId != null) focusStopFromMarker(spotId);
+  const targetZoom = Math.max(map.getZoom(), 13);
+  setView([lngLat.lat, lngLat.lng], targetZoom);
+  const popup = new maplibregl.Popup({maxWidth: '260px', className: 'stop-popup-wrap', offset: 16})
+    .setLngLat(lngLat)
+    .setHTML(html)
+    .addTo(map);
+  trackPopup(popup);
+}
+
+function bindPopup(marker, html, opts = {}) {
   if (!marker || marker._invalid) return;
   const el = marker._el || marker.getElement();
   if (!el) return;
+  if (opts.spotId != null) stopMarkerRegistry.set(opts.spotId, { marker, html });
   el.addEventListener('click', e => {
     e.stopPropagation();
-    closePopup();
-    // Guard the click closure: marker may have been removed between bind and click,
-    // and the addMarker stub returns null from getLngLat() — passing null to setLngLat throws.
-    const lngLat = marker.getLngLat && marker.getLngLat();
-    if (!lngLat) return;
-    const popup = new maplibregl.Popup({maxWidth: '220px', className: 'stop-popup-wrap', offset: 12})
-      .setLngLat(lngLat)
-      .setHTML(html)
-      .addTo(map);
-    trackPopup(popup);
+    openStopPopupAt(marker, html, opts.spotId);
   });
 }
 
+const VISIT_CHECK_SVG = '<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 6.5l2.5 2.5 4.5-5"/></svg>';
+const START_MARKER_HTML = '<div style="width:20px;height:20px;background:#0a84ff;border:2px solid #fff;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;color:#fff"><svg width="9" height="9" viewBox="0 0 9 9" fill="currentColor" aria-hidden="true"><path d="M2 1.5v6l5-3z"/></svg></div>';
+
+function popupAddrLine(spot) {
+  const addr = [spot.city, spot.state, spot.zip].filter(Boolean).join(', ');
+  return addr ? `<div class="stop-popup-addr">${esc(addr)}</div>` : '';
+}
+
+function routeMoveControl(spot) {
+  const routes = state.currentRoutes || [];
+  if (routes.length < 2) return '';
+  const currentIdx = state.visitedSet.has(spot.id)
+    ? null
+    : routes.findIndex(r => r.route.includes(state.SPOTS.findIndex(s => s.id === spot.id)));
+  const overrideIdx = (state.routeOverrides || {})[spot.id];
+  const selectedIdx = overrideIdx != null ? overrideIdx : currentIdx;
+  const selected = selectedIdx != null && routes[selectedIdx];
+  const triggerInner = selected
+    ? `<span class="route-dropdown-dot" style="background:${selected.color}"></span><span class="route-dropdown-label">${esc(selected.name)}</span>`
+    : `<span class="route-dropdown-label" style="color:var(--secondary)">Choose route…</span>`;
+  const items = routes.map((r, i) => {
+    const sel = (selectedIdx === i) ? ' selected' : '';
+    return `<div class="stop-popup-move-item route-dropdown-item${sel}" data-move-idx="${i}" role="option">
+      <span class="route-dropdown-dot" style="background:${r.color}"></span>
+      <div class="route-dropdown-item-info"><div class="route-dropdown-item-name">${esc(r.name)}</div></div>
+    </div>`;
+  }).join('');
+  return `<div class="stop-popup-move" data-move-spot-id="${spot.id}">
+    <span class="stop-popup-move-label">Move to</span>
+    <button type="button" class="stop-popup-move-trigger route-dropdown-trigger" aria-haspopup="listbox" aria-expanded="false">${triggerInner}</button>
+    <div class="stop-popup-move-menu route-dropdown-menu" role="listbox">${items}</div>
+  </div>`;
+}
+
+function stopPopupHTML(spot, num, color, opts = {}) {
+  const visitBtn = opts.visitedAlready
+    ? `<button class="stop-popup-btn stop-popup-btn-unvisit" data-visit-id="${spot.id}">${VISIT_CHECK_SVG} Unvisited</button>`
+    : `<button class="stop-popup-btn stop-popup-btn-visit" data-visit-id="${spot.id}">${VISIT_CHECK_SVG} Visited</button>`;
+  const deleteBtn = `<button class="stop-popup-btn stop-popup-btn-delete" data-delete-spot-id="${spot.id}" aria-label="Delete stop">${TRASH_SVG_POPUP} Delete</button>`;
+  const label = opts.label || `Stop ${num}`;
+  const leg = opts.leg
+    ? `<div class="stop-popup-leg">${fmtMi(opts.leg.distance)} mi · ${fmtDur(opts.leg.duration)} from ${opts.legFrom || 'prev'}</div>`
+    : '';
+  const move = routeMoveControl(spot);
+  return `<div class="stop-popup">
+    <div class="stop-popup-label" style="color:${color}">${label}</div>
+    <div class="stop-popup-street">${esc(spot.street || '')}</div>
+    ${popupAddrLine(spot)}
+    ${leg}
+    ${move}
+    <div class="stop-popup-actions">${visitBtn}${deleteBtn}</div>
+  </div>`;
+}
+
+// Same trash glyph as the inline panel button (.stop-item-trash) so the
+// popup's Delete action and the row's quick-delete read as the same thing.
+const TRASH_SVG_POPUP = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4.5h10M5.5 4.5V3a1 1 0 011-1h3a1 1 0 011 1v1.5M4 4.5l.7 8.5a1 1 0 001 .9h4.6a1 1 0 001-.9L12 4.5M6.8 7.5v4M9.2 7.5v4"/></svg>';
+
+function endpointPopup(point, label, color) {
+  return `<div class="stop-popup"><div class="stop-popup-label" style="color:${color}">${label}</div><div class="stop-popup-street">${esc(point.label)}</div></div>`;
+}
+
+// Place start, end, and GPS markers and push their bounds. Returns nothing.
+let gpsMarker = null;
+function placeEndpointMarkers(bounds) {
+  if (state.home && Number.isFinite(state.home.lat) && Number.isFinite(state.home.lng)) {
+    const mk = addMarker(state.home.lat, state.home.lng, homeIcon());
+    bindPopup(mk, endpointPopup(state.home, 'End Point', '#FF9500'));
+    bounds.push([state.home.lat, state.home.lng]);
+  }
+  if (state.startPoint && Number.isFinite(state.startPoint.lat) && Number.isFinite(state.startPoint.lng)) {
+    const mk = addMarker(state.startPoint.lat, state.startPoint.lng, {html: START_MARKER_HTML});
+    bindPopup(mk, endpointPopup(state.startPoint, 'Start Point', '#0a84ff'));
+    bounds.push([state.startPoint.lat, state.startPoint.lng]);
+  }
+  if (gpsMarker) { gpsMarker.remove(); gpsMarker = null; }
+  if (state.gpsPos && Number.isFinite(state.gpsPos.lat) && Number.isFinite(state.gpsPos.lng)) {
+    gpsMarker = addMarker(state.gpsPos.lat, state.gpsPos.lng, gpsIcon());
+  }
+}
+
+function fitToBounds(bounds) {
+  if (bounds.length && !state.suppressFitBounds) {
+    const isDesktop = window.innerWidth >= 768;
+    const padding = isDesktop ? {paddingTopLeft: [60, 80], paddingBottomRight: [420, 60]} : {padding: [60, 220]};
+    fitBounds(bounds, padding);
+  }
+  state.suppressFitBounds = false;
+}
+
+function renderPanels() {
+  const isCalculating = document.getElementById('loading').classList.contains('active');
+  renderFilterBar(closeRouteDropdown, renderView);
+  renderStats(isCalculating);
+  renderStopList();
+  renderRouteSettings(isCalculating);
+  updateProgress();
+  updateStopsInfo();
+  document.getElementById('travelModeBar').classList.toggle('show', state.SPOTS.length > 0);
+}
+
+
+// Visited filter (-2) implies the visited markers must be on screen — there's
+// nothing else to show. Force the toggle on while the filter is active and
+// snap it back to the user's prior choice (default off) when they leave.
+let visitedToggleSavedState = null;
+function syncVisitedToggleForFilter() {
+  const btn = document.getElementById('toggleVisitedBtn');
+  if (state.activeFilter === -2) {
+    if (visitedToggleSavedState === null) visitedToggleSavedState = state.showVisitedMarkers;
+    state.showVisitedMarkers = true;
+  } else if (visitedToggleSavedState !== null) {
+    state.showVisitedMarkers = false;
+    visitedToggleSavedState = null;
+  }
+  if (btn) {
+    btn.style.opacity = state.showVisitedMarkers ? '1' : '.5';
+    btn.style.color = state.showVisitedMarkers ? 'var(--green)' : '';
+    btn.disabled = state.activeFilter === -2;
+    btn.style.cursor = state.activeFilter === -2 ? 'not-allowed' : 'pointer';
+  }
+}
 
 export function renderView() {
   // Drop the empty-state expanded sheet & resize map BEFORE projecting markers.
@@ -34,8 +182,16 @@ export function renderView() {
   // still up, the map canvas has the wrong dimensions and markers project to
   // the wrong screen pixels. Running this first means addMarker() below sees
   // the final canvas size.
+  // Clear marker focus on full re-renders — markers are torn down here, so
+  // any highlighted row no longer corresponds to a visible marker. The user
+  // re-clicks to bring it back.
+  state.focusedStopId = null;
+  syncVisitedToggleForFilter();
   updateEmptyState();
   clearMap();
+  // Markers are torn down by clearMap — drop the registry so a stale entry
+  // doesn't get re-opened by a panel click against a removed maplibre marker.
+  stopMarkerRegistry.clear();
   const routes = getActiveRoutes();
   const bounds = [];
   const routeSpotIds = new Set();
@@ -44,34 +200,9 @@ export function renderView() {
   // Special case: Visited-only view (activeFilter === -2)
   if (state.activeFilter === -2) {
     renderVisitedMarkersOnly(bounds, bindPopup);
-    if (state.home && Number.isFinite(state.home.lat) && Number.isFinite(state.home.lng)) {
-      const mk = addMarker(state.home.lat, state.home.lng, homeIcon());
-      bindPopup(mk, `<div class="stop-popup"><div class="stop-popup-label" style="color:#FF9500">End Point</div><div class="stop-popup-street">${esc(state.home.label)}</div></div>`);
-      bounds.push([state.home.lat, state.home.lng]);
-    }
-    if (state.startPoint && Number.isFinite(state.startPoint.lat) && Number.isFinite(state.startPoint.lng)) {
-      const mk = addMarker(state.startPoint.lat, state.startPoint.lng, {html: '<div style="width:20px;height:20px;background:#007AFF;border:2px solid #fff;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff">&#9654;</div>'});
-      bindPopup(mk, `<div class="stop-popup"><div class="stop-popup-label" style="color:#007AFF">Start Point</div><div class="stop-popup-street">${esc(state.startPoint.label)}</div></div>`);
-      bounds.push([state.startPoint.lat, state.startPoint.lng]);
-    }
-    if (gpsMarker) { gpsMarker.remove(); gpsMarker = null; }
-    if (state.gpsPos && Number.isFinite(state.gpsPos.lat) && Number.isFinite(state.gpsPos.lng)) {
-      gpsMarker = addMarker(state.gpsPos.lat, state.gpsPos.lng, gpsIcon());
-    }
-    if (bounds.length && !state.suppressFitBounds) {
-      const isDesktop = window.innerWidth >= 768;
-      const padding = isDesktop ? {paddingTopLeft: [60, 80], paddingBottomRight: [420, 60]} : {padding: [60, 220]};
-      fitBounds(bounds, padding);
-    }
-    state.suppressFitBounds = false;
-    const isCalculating = document.getElementById('loading').classList.contains('active');
-    renderFilterBar(closeRouteDropdown, renderView);
-    renderStats(isCalculating);
-    renderStopList();
-    renderRouteSettings(isCalculating);
-    updateProgress();
-    updateStopsInfo();
-    document.getElementById('travelModeBar').classList.toggle('show', state.SPOTS.length > 0);
+    placeEndpointMarkers(bounds);
+    fitToBounds(bounds);
+    renderPanels();
     return;
   }
   // If there are no resolved routes yet, render the raw stop list so users
@@ -82,10 +213,8 @@ export function renderView() {
         if (state.visitedSet.has(spot.id) && !state.showVisitedMarkers) return;
         if (!Number.isFinite(spot.lat) || !Number.isFinite(spot.lng)) return;
         const visited = state.visitedSet.has(spot.id);
-        const mk = addMarker(spot.lat, spot.lng, stopIcon(i + 1, '#007AFF', visited, false));
-        const addr = [spot.city, spot.state, spot.zip].filter(Boolean).join(', ');
-        const popup = `<div class="stop-popup"><div class="stop-popup-label" style="color:#007AFF">Stop ${i + 1}</div><div class="stop-popup-street">${esc(spot.street || '')}</div>${addr ? `<div class="stop-popup-addr">${esc(addr)}</div>` : ''}<button class="stop-popup-btn stop-popup-btn-visit" data-visit-id="${spot.id}">&#10003; Mark Visited</button></div>`;
-        bindPopup(mk, popup);
+        const mk = addMarker(spot.lat, spot.lng, stopIcon(i + 1, PRIMARY_ROUTE_COLOR, visited, false));
+        bindPopup(mk, stopPopupHTML(spot, i + 1, PRIMARY_ROUTE_COLOR, {visitedAlready: visited}), {spotId: spot.id});
         bounds.push([spot.lat, spot.lng]);
       } catch (err) {
         console.warn('renderView: skipped stop', i, err);
@@ -99,21 +228,16 @@ export function renderView() {
     }
     const spots = rd.route.map(i => typeof i === 'number' ? state.SPOTS[i] : i);
     const firstUnvisitedMap = spots.findIndex(s => !state.visitedSet.has((typeof s === 'number' ? state.SPOTS[s] : s).id));
+    const legOffset = getStartLocation() ? 1 : 0;
     spots.forEach((s, i) => {
       try {
         const spot = typeof s === 'number' ? state.SPOTS[s] : s;
         if (!spot || !Number.isFinite(spot.lat) || !Number.isFinite(spot.lng)) return;
-        const sid = spot.id;
-        routeSpotIds.add(sid);
+        routeSpotIds.add(spot.id);
         const curr = i === firstUnvisitedMap || (firstUnvisitedMap === -1 && i === 0);
         const mk = addMarker(spot.lat, spot.lng, stopIcon(i + 1, rd.color, false, curr));
-        const legOffset = getStartLocation() ? 1 : 0;
-        const legInfo = rd.legs && rd.legs[legOffset + i];
-        const addr = [spot.city, spot.state, spot.zip].filter(Boolean).join(', ');
-        let popup = `<div class="stop-popup"><div class="stop-popup-label" style="color:${rd.color}">Stop ${i + 1}</div><div class="stop-popup-street">${esc(spot.street)}</div>${addr ? `<div class="stop-popup-addr">${esc(addr)}</div>` : ''}`;
-        if (legInfo) popup += `<div class="stop-popup-leg">${fmtMi(legInfo.distance)} mi · ${fmtDur(legInfo.duration)} from ${i === 0 ? 'start' : 'prev'}</div>`;
-        popup += `<button class="stop-popup-btn stop-popup-btn-visit" data-visit-id="${sid}">&#10003; Mark Visited</button></div>`;
-        bindPopup(mk, popup);
+        const leg = rd.legs && rd.legs[legOffset + i];
+        bindPopup(mk, stopPopupHTML(spot, i + 1, rd.color, {leg, legFrom: i === 0 ? 'start' : 'prev'}), {spotId: spot.id});
         bounds.push([spot.lat, spot.lng]);
       } catch (err) {
         console.warn('renderView: skipped routed stop', i, err);
@@ -123,45 +247,16 @@ export function renderView() {
   if (state.showVisitedMarkers) {
     state.SPOTS.filter(s => state.visitedSet.has(s.id) && !routeSpotIds.has(s.id) && Number.isFinite(s.lat) && Number.isFinite(s.lng)).forEach(spot => {
       try {
-        const mk = addMarker(spot.lat, spot.lng, stopIcon('&#10003;', '#aeaeb2', true, false));
-        const addr = [spot.city, spot.state, spot.zip].filter(Boolean).join(', ');
-        let popup = `<div class="stop-popup"><div class="stop-popup-label" style="color:#aeaeb2">Visited</div><div class="stop-popup-street">${esc(spot.street)}</div>${addr ? `<div class="stop-popup-addr">${esc(addr)}</div>` : ''}`;
-        popup += `<button class="stop-popup-btn stop-popup-btn-unvisit" data-visit-id="${spot.id}">Mark Unvisited</button></div>`;
-        bindPopup(mk, popup);
+        const mk = addMarker(spot.lat, spot.lng, stopIcon('', VISITED_COLOR, true, false));
+        bindPopup(mk, stopPopupHTML(spot, 0, VISITED_COLOR, {label: 'Visited', visitedAlready: true}), {spotId: spot.id});
       } catch (err) {
         console.warn('renderView: skipped visited marker', err);
       }
     });
   }
-  if (state.home && Number.isFinite(state.home.lat) && Number.isFinite(state.home.lng)) {
-    const mk = addMarker(state.home.lat, state.home.lng, homeIcon());
-    bindPopup(mk, `<div class="stop-popup"><div class="stop-popup-label" style="color:#FF9500">End Point</div><div class="stop-popup-street">${esc(state.home.label)}</div></div>`);
-    bounds.push([state.home.lat, state.home.lng]);
-  }
-  if (state.startPoint && Number.isFinite(state.startPoint.lat) && Number.isFinite(state.startPoint.lng)) {
-    const mk = addMarker(state.startPoint.lat, state.startPoint.lng, {html: '<div style="width:20px;height:20px;background:#007AFF;border:2px solid #fff;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff">&#9654;</div>'});
-    bindPopup(mk, `<div class="stop-popup"><div class="stop-popup-label" style="color:#007AFF">Start Point</div><div class="stop-popup-street">${esc(state.startPoint.label)}</div></div>`);
-    bounds.push([state.startPoint.lat, state.startPoint.lng]);
-  }
-  if (gpsMarker) { gpsMarker.remove(); gpsMarker = null; }
-  if (state.gpsPos && Number.isFinite(state.gpsPos.lat) && Number.isFinite(state.gpsPos.lng)) {
-    gpsMarker = addMarker(state.gpsPos.lat, state.gpsPos.lng, gpsIcon());
-  }
-  if (bounds.length && !state.suppressFitBounds) {
-    const isDesktop = window.innerWidth >= 768;
-    const padding = isDesktop ? {paddingTopLeft: [60, 80], paddingBottomRight: [420, 60]} : {padding: [60, 220]};
-    fitBounds(bounds, padding);
-  }
-  state.suppressFitBounds = false;
-
-  const isCalculating = document.getElementById('loading').classList.contains('active');
-  renderFilterBar(closeRouteDropdown, renderView);
-  renderStats(isCalculating);
-  renderStopList();
-  renderRouteSettings(isCalculating);
-  updateProgress();
-  updateStopsInfo();
-  document.getElementById('travelModeBar').classList.toggle('show', state.SPOTS.length > 0);
+  placeEndpointMarkers(bounds);
+  fitToBounds(bounds);
+  renderPanels();
 }
 
 export function toggleRouteDropdown() {
@@ -177,122 +272,18 @@ export function closeRouteDropdown() {
   document.getElementById('routeDropdownMenu').classList.remove('open');
 }
 
-export function renderStopList() {
-  const el = document.getElementById('stopsView'); el.innerHTML = '';
-  const routes = getActiveRoutes();
-  const query = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
-
-  // Special case: Visited-only view (activeFilter === -2)
-  if (state.activeFilter === -2) {
-    renderVisitedOnlyView(el, query);
-    return;
-  }
-
-  // No resolved route yet — show stops in import order so the panel isn't blank.
-  if (!routes.length && state.SPOTS.length) {
-    state.SPOTS.forEach((spot, i) => {
-      if (query && !spot.street.toLowerCase().includes(query) && (!spot.city || !spot.city.toLowerCase().includes(query))) return;
-      const visited = state.visitedSet.has(spot.id);
-      const item = document.createElement('div');
-      item.className = 'stop-item' + (visited ? ' visited' : '');
-      item.innerHTML = `
-        <div class="stop-item-check" role="checkbox" tabindex="0" aria-checked="${visited}" aria-label="Toggle ${esc(spot.street || 'stop')} visited">${visited ? '&#10003;' : ''}</div>
-        <div class="stop-item-num" style="background:#007AFF">${i + 1}</div>
-        <div class="stop-item-info">
-          <div class="stop-item-name">${esc(spot.street || `Stop ${i + 1}`)}</div>
-          <div class="stop-item-detail"><span>${esc(spot.city || '')}${spot.state ? ', ' + esc(spot.state) : ''}</span></div>
-        </div>`;
-      item.querySelector('.stop-item-check').onclick = (e) => { e.stopPropagation(); toggleVisited(spot.id); };
-      item.onclick = () => setView([spot.lat, spot.lng], 16);
-      el.appendChild(item);
-    });
-    return;
-  }
-  routes.forEach((rd, ri) => {
-    if (routes.length > 1) {
-      const hdr = document.createElement('div');
-      hdr.className = 'section-hdr';
-      hdr.innerHTML = `<span class="section-hdr-dot" style="background:${rd.color}"></span><span class="section-hdr-title">${esc(rd.name)}</span><span class="section-hdr-meta">${rd.route.length} remaining &middot; ${rd.totalMiles.toFixed(1)} mi</span>`;
-      hdr.onclick = () => { state.activeFilter = ri; renderView(); };
-      el.appendChild(hdr);
-    }
-    const origin = getStartLocation();
-    if (origin && rd.legs && rd.legs.length > 0) {
-      const hi = document.createElement('div'); hi.className = 'stop-item is-home';
-      hi.innerHTML = `<div class="stop-item-num" style="background:#007AFF">&#9654;</div><div class="stop-item-info"><div class="stop-item-name">${esc(origin.label) || 'Current Location'}</div><div class="stop-item-detail"><span>Start</span><span>${fmtMi(rd.legs[0].distance)} mi to first stop</span></div></div>`;
-      hi.onclick = () => setView([origin.lat, origin.lng], 15);
-      el.appendChild(hi);
-    }
-    const spots = rd.route.map(i => typeof i === 'number' ? state.SPOTS[i] : i);
-    const unvisitedSpots = spots.filter(s => !state.visitedSet.has((typeof s === 'number' ? state.SPOTS[s] : s).id));
-    let stopNum = 0;
-    unvisitedSpots.forEach((s, i) => {
-      const spot = typeof s === 'number' ? state.SPOTS[s] : s;
-      if (query && !spot.street.toLowerCase().includes(query) && !spot.city.toLowerCase().includes(query)) return;
-      stopNum++;
-      const curr = i === 0;
-      const leg = rd.legs ? rd.legs[(getStartLocation() ? 1 : 0) + spots.indexOf(s)] : null;
-      const item = document.createElement('div');
-      item.className = 'stop-item' + (curr ? ' current' : '');
-      item.innerHTML = `
-        <div class="stop-item-check" role="checkbox" tabindex="0" aria-checked="false" aria-label="Mark ${esc(spot.street)} as visited"></div>
-        <div class="stop-item-num" style="background:${rd.color}">${stopNum}</div>
-        <div class="stop-item-info">
-          <div class="stop-item-name">${esc(spot.street)}</div>
-          <div class="stop-item-detail"><span>${esc(spot.city)}${spot.state ? ', ' + esc(spot.state) : ''}</span>${leg ? `<span>${fmtMi(leg.distance)} mi · ${fmtDur(leg.duration)}</span>` : ''}</div>
-        </div>`;
-      item.style.animationDelay = `${i * 30}ms`;
-      item.querySelector('.stop-item-check').onclick = (e) => { e.stopPropagation(); toggleVisited(spot.id); };
-      item.onclick = () => setView([spot.lat, spot.lng], 16);
-      el.appendChild(item);
-      if (curr && !query) setTimeout(() => item.scrollIntoView({behavior: 'smooth', block: 'center'}), 300);
-    });
-    if (state.home && rd.legs && rd.legs.length > 1) {
-      const hi = document.createElement('div'); hi.className = 'stop-item is-home';
-      const lastLeg = rd.legs[rd.legs.length - 1];
-      hi.innerHTML = `<div class="stop-item-num" style="background:#FF9500">&#9750;</div><div class="stop-item-info"><div class="stop-item-name">${esc(state.home.label)}</div><div class="stop-item-detail"><span>Return to End</span><span>${fmtMi(lastLeg.distance)} mi · ${fmtDur(lastLeg.duration)} from last stop</span></div></div>`;
-      hi.onclick = () => setView([state.home.lat, state.home.lng], 15);
-      el.appendChild(hi);
-    }
-  });
-
-  // Show visited stops in a single "Visited" section (no route grouping except in Visited view)
-  const visitedSpots = state.SPOTS.filter(s => state.visitedSet.has(s.id));
-  if (visitedSpots.length) {
-    if (query && !visitedSpots.some(s => s.street.toLowerCase().includes(query) || s.city.toLowerCase().includes(query))) return;
-
-    const hdr = document.createElement('div');
-    hdr.className = 'section-hdr section-hdr-visited';
-    hdr.innerHTML = `<span class="section-hdr-dot" style="background:var(--tertiary)"></span><span class="section-hdr-title">Visited</span><span class="section-hdr-meta">${visitedSpots.length} done</span>`;
-    el.appendChild(hdr);
-
-    visitedSpots.forEach(spot => {
-      if (query && !spot.street.toLowerCase().includes(query) && !spot.city.toLowerCase().includes(query)) return;
-      const item = document.createElement('div');
-      item.className = 'stop-item visited';
-      item.innerHTML = `
-        <div class="stop-item-check" role="checkbox" tabindex="0" aria-checked="true" aria-label="Mark ${esc(spot.street)} as not visited">&#10003;</div>
-        <div class="stop-item-info">
-          <div class="stop-item-name">${esc(spot.street)}</div>
-          <div class="stop-item-detail"><span>${esc(spot.city)}${spot.state ? ', ' + esc(spot.state) : ''}</span></div>
-        </div>`;
-      item.querySelector('.stop-item-check').onclick = (e) => { e.stopPropagation(); toggleVisited(spot.id); };
-      item.onclick = () => setView([spot.lat, spot.lng], 16);
-      el.appendChild(item);
-    });
-  }
-}
-
 function updateEmptyState() {
   const empty = document.getElementById('emptyState');
   const stopsView = document.getElementById('stopsView');
   const sheet = document.getElementById('bottomSheet');
-  const fab = document.getElementById('fabAddStops');
+  const clearFab = document.getElementById('clearStopsFab');
   const topBar = document.querySelector('.top-bar');
-  if (!state.SPOTS.length) {
+  const hasStops = state.SPOTS.length > 0;
+  // Trash FAB is meaningless without stops — hide it.
+  if (clearFab) clearFab.style.display = hasStops ? '' : 'none';
+  if (!hasStops) {
     empty.style.display = 'block'; stopsView.style.display = 'none';
     sheet.classList.add('expanded');
-    fab.classList.add('show');
     topBar.style.display = 'none';
   } else {
     empty.style.display = 'none'; stopsView.style.display = '';
@@ -301,7 +292,6 @@ function updateEmptyState() {
     // and on desktop fitBounds measures stale canvas dimensions.
     sheet.classList.remove('expanded');
     if (state.sheetState === 'expanded') state.sheetState = 'peek';
-    fab.classList.remove('show');
     topBar.style.display = '';
     // Resize the map canvas synchronously: callers (renderView) place markers
     // immediately after, so we need correct canvas dimensions NOW rather than
@@ -330,8 +320,65 @@ export function setSheetState(s) {
 }
 
 document.addEventListener('click', e => {
-  const btn = e.target.closest('[data-visit-id]');
-  if (!btn) return;
-  const id = parseInt(btn.dataset.visitId, 10);
-  if (Number.isFinite(id)) { toggleVisited(id); closePopup(); }
+  const visitBtn = e.target.closest('[data-visit-id]');
+  if (visitBtn) {
+    const id = parseInt(visitBtn.dataset.visitId, 10);
+    if (Number.isFinite(id)) { toggleVisited(id); closePopup(); }
+    return;
+  }
+  const delBtn = e.target.closest('[data-delete-spot-id]');
+  if (delBtn) {
+    const id = parseInt(delBtn.dataset.deleteSpotId, 10);
+    if (Number.isFinite(id)) { closePopup(); deleteStop(id); }
+  }
+});
+
+document.addEventListener('click', e => {
+  const trigger = e.target.closest('.stop-popup-move-trigger');
+  if (trigger) {
+    e.stopPropagation();
+    const wrap = trigger.closest('.stop-popup-move');
+    const menu = wrap && wrap.querySelector('.stop-popup-move-menu');
+    if (!menu) return;
+    const isOpen = menu.classList.contains('open');
+    document.querySelectorAll('.stop-popup-move-menu.open').forEach(m => m.classList.remove('open'));
+    document.querySelectorAll('.stop-popup-move-trigger.open').forEach(t => {
+      t.classList.remove('open');
+      t.setAttribute('aria-expanded', 'false');
+    });
+    if (!isOpen) {
+      menu.classList.add('open');
+      trigger.classList.add('open');
+      trigger.setAttribute('aria-expanded', 'true');
+    }
+    return;
+  }
+  const item = e.target.closest('.stop-popup-move-item');
+  if (item) {
+    e.stopPropagation();
+    const wrap = item.closest('.stop-popup-move');
+    const id = wrap && parseInt(wrap.dataset.moveSpotId, 10);
+    const ridx = parseInt(item.dataset.moveIdx, 10);
+    if (!Number.isFinite(id) || !Number.isFinite(ridx)) return;
+    closePopup();
+    import('./stop-list-render.js').then(m => m.setRouteOverride(id, ridx));
+    return;
+  }
+  // Click outside any open move menu — close it.
+  document.querySelectorAll('.stop-popup-move-menu.open').forEach(m => m.classList.remove('open'));
+  document.querySelectorAll('.stop-popup-move-trigger.open').forEach(t => {
+    t.classList.remove('open');
+    t.setAttribute('aria-expanded', 'false');
+  });
+});
+
+// Panel rows dispatch this when the user clicks; we re-open the same popup
+// the marker click would show. Decoupled via custom event so stop-list-render
+// doesn't need to import map/popup helpers (avoids a circular dep).
+document.addEventListener('routeflow:show-stop-popup', e => {
+  const spotId = e.detail && e.detail.spotId;
+  if (spotId == null) return;
+  const entry = stopMarkerRegistry.get(spotId);
+  if (!entry) return;
+  openStopPopupAt(entry.marker, entry.html, spotId);
 });

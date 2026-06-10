@@ -1,4 +1,4 @@
-import { state, STORE_V, STORE_ROUTE_MAP, saveSet, saveJSON } from './state.js';
+import { state, STORE_V, STORE_ROUTE_MAP, saveSet, saveJSON, VISITED_COLOR } from './state.js';
 import { toast, esc } from './utils.js';
 import { render } from './planner.js';
 import { addMarker, stopIcon } from './map.js';
@@ -58,14 +58,14 @@ export function renderVisitedMarkersOnly(bounds, bindPopup) {
     const route = (routeIdx !== undefined && routeIdx >= 0 && routeIdx < state.currentRoutes.length)
       ? state.currentRoutes[routeIdx]
       : null;
-    const color = route ? route.color : '#aeaeb2';
+    const color = route ? route.color : VISITED_COLOR;
 
     try {
-      const mk = addMarker(spot.lat, spot.lng, stopIcon('&#10003;', color, true, false));
+      const mk = addMarker(spot.lat, spot.lng, stopIcon('', color, true, false));
       const addr = [spot.city, spot.state, spot.zip].filter(Boolean).join(', ');
       let popup = `<div class="stop-popup"><div class="stop-popup-label" style="color:${color}">Visited</div><div class="stop-popup-street">${esc(spot.street)}</div>${addr ? `<div class="stop-popup-addr">${esc(addr)}</div>` : ''}`;
       popup += `<button class="stop-popup-btn stop-popup-btn-unvisit" data-visit-id="${spot.id}">Mark Unvisited</button></div>`;
-      bindPopup(mk, popup);
+      bindPopup(mk, popup, {spotId: spot.id});
       bounds.push([spot.lat, spot.lng]);
     } catch (err) {
       console.warn('renderVisitedMarkersOnly: skipped marker', err);
@@ -74,10 +74,8 @@ export function renderVisitedMarkersOnly(bounds, bindPopup) {
 }
 
 /**
- * Update progress bar width based on visited/total ratio.
+ * Visited-progress indicator was removed (the animated sweep read as a
+ * loading flash). Kept as a no-op so existing call sites still work; can be
+ * deleted once all callers are pruned.
  */
-export function updateProgress() {
-  const total = state.SPOTS.length;
-  const done = state.visitedSet.size;
-  document.getElementById('progressBar').style.width = `${total ? (done / total) * 100 : 0}%`;
-}
+export function updateProgress() {}

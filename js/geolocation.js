@@ -6,7 +6,8 @@ import { GPS_SILENT_TIMEOUT_MS, GPS_TIMEOUT_MS } from './constants.js';
 function onPosition(render, pos) {
   state.gpsPos = {lat: pos.coords.latitude, lng: pos.coords.longitude, acc: pos.coords.accuracy};
   state.gpsState = 'granted';
-  if (!state.startPoint && state.SPOTS.length) { state.durationMatrix = null; render(); }
+  // GPS only counts as the origin when start mode is 'auto' AND no explicit pin is set.
+  if (state.startMode !== 'none' && !state.startPoint && state.SPOTS.length) { state.durationMatrix = null; render(); }
   else { state.suppressFitBounds = true; renderView(); }
 }
 
